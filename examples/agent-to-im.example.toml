@@ -1,0 +1,58 @@
+# Planned configuration format for the implementation phase.
+# Architecture reference. Runtime uses CLI flags + generated settings.json;
+# executable setup is documented in docs/quickstart.md.
+contract_version = "0.2.0"
+data_dir = "D:/agent-to-IM/.local"
+
+[broker]
+host = "127.0.0.1"
+port = 17642
+agent_client_credentials_dir = "D:/agent-to-IM/.local/clients"
+
+[portal]
+host = "127.0.0.1"
+port = 17643
+authentication = "local_admin_session"
+bootstrap = "interactive_local_setup"
+csrf_protection = true
+
+[access]
+first_use = "web_approval"
+grant_store = "sqlite"
+default_grant_lifetime = "until_revoked"
+recheck_before_dispatch = true
+preapproval_input = "metadata_only"
+
+[runtime]
+agent = "codex"
+default_mode = "attached"
+codex_executable = "codex"
+workspace_concurrency = 1
+agent_home = "preserve_attached"
+# Users start/resume Codex locally; this phase attaches verified live sessions.
+
+[workspaces.agent-im]
+path = "D:/agent-to-IM"
+
+[wait]
+call_timeout_seconds = 240
+max_call_timeout_seconds = 300
+reply_ttl_seconds = 1800
+max_reply_ttl_seconds = 3600
+
+[im]
+configuration_store = "sqlite"
+credential_backend = "windows_dpapi_current_user"
+
+[im.feishu]
+receive_mode = "long_connection"
+conversation_kind = "direct"
+# App ID and credential references are maintained through Portal/authorized MCP.
+
+[delivery]
+im_turn_final_fallback = true
+include_session_label = true
+
+[stop]
+grace_seconds = 10
+require_verified_completion = true

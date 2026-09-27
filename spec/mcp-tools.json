@@ -1,0 +1,173 @@
+{
+  "contract_version": "0.2.0",
+  "status": "implemented-local-acceptance",
+  "tools": [
+    {
+      "name": "register",
+      "description": "Register the verified existing agent session with a Web-approved IM connection. Runtime identity and persistent access grants are checked outside model arguments.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["connection_alias", "title", "idempotency_key"],
+        "properties": {
+          "connection_alias": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "native_thread_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "activate": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    {
+      "name": "send_message_to_user",
+      "description": "Send a message from the current registered session to its authorized IM route. Retry with the same idempotency key for the same content.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["session_id", "text", "idempotency_key"],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "text": { "type": "string", "minLength": 1, "maxLength": 12000 },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": ["notice", "progress", "result"],
+            "default": "notice"
+          }
+        }
+      }
+    },
+    {
+      "name": "wait_for_user_message",
+      "description": "Ask a question once and wait for its user's reply. Resume the same request key after a bounded wait to retain the question and deadline.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["session_id", "mode", "request_key"],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "mode": { "type": "string", "enum": ["ask", "resume"] },
+          "request_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "prompt": { "type": "string", "minLength": 1, "maxLength": 12000 },
+          "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 300, "default": 240 },
+          "reply_ttl_seconds": { "type": "integer", "minimum": 60, "maximum": 3600, "default": 1800 }
+        },
+        "if": { "properties": { "mode": { "const": "ask" } } },
+        "then": { "required": ["prompt"] },
+        "else": { "properties": { "prompt": false, "reply_ttl_seconds": false } }
+      }
+    },
+    {
+      "name": "configure_im_channel",
+      "description": "Inspect, save, validate, or enable an IM channel within Web-approved access. First use returns an approval request; decisions are made in the local Web Portal.",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "provider"],
+            "properties": {
+              "operation": { "const": "inspect" },
+              "provider": { "const": "feishu" },
+              "channel_id": { "type": "string", "pattern": "^ch_[A-Za-z0-9_-]{8,128}$" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "provider", "channel_alias", "display_name", "app_id", "credential_ref", "expected_revision", "idempotency_key"],
+            "properties": {
+              "operation": { "const": "upsert" },
+              "provider": { "const": "feishu" },
+              "channel_alias": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+              "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "app_id": { "type": "string", "pattern": "^cli_[A-Za-z0-9]+$" },
+              "credential_ref": { "type": "string", "pattern": "^cred_[A-Za-z0-9_-]{8,128}$" },
+              "expected_revision": { "type": "integer", "minimum": 0 },
+              "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "channel_id", "expected_revision", "idempotency_key"],
+            "properties": {
+              "operation": { "const": "validate" },
+              "channel_id": { "type": "string", "pattern": "^ch_[A-Za-z0-9_-]{8,128}$" },
+              "expected_revision": { "type": "integer", "minimum": 1 },
+              "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "channel_id", "enabled", "expected_revision", "idempotency_key"],
+            "properties": {
+              "operation": { "const": "set_enabled" },
+              "channel_id": { "type": "string", "pattern": "^ch_[A-Za-z0-9_-]{8,128}$" },
+              "enabled": { "type": "boolean" },
+              "expected_revision": { "type": "integer", "minimum": 1 },
+              "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "approval_request_id"],
+            "properties": {
+              "operation": { "const": "approval_status" },
+              "approval_request_id": { "type": "string", "pattern": "^apr_[A-Za-z0-9_-]{8,128}$" }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

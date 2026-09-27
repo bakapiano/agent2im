@@ -1,0 +1,479 @@
+{
+  "cases": [
+    {
+      "name": "register approved connection",
+      "tool": "register",
+      "valid": true,
+      "arguments": {
+        "connection_alias": "personal-feishu",
+        "title": "登录问题",
+        "idempotency_key": "register-01"
+      }
+    },
+    {
+      "name": "register with explicit activation and native identity candidate",
+      "tool": "register",
+      "valid": true,
+      "arguments": {
+        "connection_alias": "personal-feishu",
+        "title": "登录问题",
+        "idempotency_key": "register-02",
+        "activate": true,
+        "native_thread_id": "native-thread-01"
+      }
+    },
+    {
+      "name": "register needs a title",
+      "tool": "register",
+      "valid": false,
+      "arguments": {
+        "connection_alias": "personal-feishu",
+        "idempotency_key": "register-03"
+      }
+    },
+    {
+      "name": "runtime endpoint belongs to trusted setup",
+      "tool": "register",
+      "valid": false,
+      "arguments": {
+        "connection_alias": "personal-feishu",
+        "title": "登录问题",
+        "idempotency_key": "register-04",
+        "endpoint": "http://example.invalid"
+      }
+    },
+    {
+      "name": "send progress with stable key",
+      "tool": "send_message_to_user",
+      "valid": true,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "text": "正在检查",
+        "idempotency_key": "turn-01-progress-01",
+        "purpose": "progress"
+      }
+    },
+    {
+      "name": "send requires nonempty text",
+      "tool": "send_message_to_user",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "text": "",
+        "idempotency_key": "turn-01-progress-02"
+      }
+    },
+    {
+      "name": "MCP uses full session IDs",
+      "tool": "send_message_to_user",
+      "valid": false,
+      "arguments": {
+        "session_id": "s_a7af",
+        "text": "检查完成",
+        "idempotency_key": "turn-01-result-01"
+      }
+    },
+    {
+      "name": "recipient comes from registered route",
+      "tool": "send_message_to_user",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "text": "检查完成",
+        "idempotency_key": "turn-01-result-02",
+        "recipient": "other-user"
+      }
+    },
+    {
+      "name": "ask with bounded wait and reply lifetime",
+      "tool": "wait_for_user_message",
+      "valid": true,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "ask",
+        "request_key": "question-01",
+        "prompt": "请选择本次修改范围。",
+        "timeout_seconds": 240,
+        "reply_ttl_seconds": 1800
+      }
+    },
+    {
+      "name": "resume retains question and lifetime",
+      "tool": "wait_for_user_message",
+      "valid": true,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "resume",
+        "request_key": "question-01",
+        "timeout_seconds": 240
+      }
+    },
+    {
+      "name": "ask requires a prompt",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "ask",
+        "request_key": "question-02"
+      }
+    },
+    {
+      "name": "resume keeps the existing prompt",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "resume",
+        "request_key": "question-01",
+        "prompt": "替换问题"
+      }
+    },
+    {
+      "name": "resume keeps the existing deadline",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "resume",
+        "request_key": "question-01",
+        "reply_ttl_seconds": 3600
+      }
+    },
+    {
+      "name": "wait fits the MCP timeout budget",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "ask",
+        "request_key": "question-03",
+        "prompt": "确认范围？",
+        "timeout_seconds": 301
+      }
+    },
+    {
+      "name": "reply lifetime is bounded",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "ask",
+        "request_key": "question-04",
+        "prompt": "确认范围？",
+        "reply_ttl_seconds": 3601
+      }
+    },
+    {
+      "name": "owner identity stays outside model arguments",
+      "tool": "wait_for_user_message",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "mode": "ask",
+        "request_key": "question-05",
+        "prompt": "确认范围？",
+        "principal_id": "other-owner"
+      }
+    },
+    {
+      "name": "inspect public requirements",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "inspect",
+        "provider": "feishu"
+      }
+    },
+    {
+      "name": "inspect selected channel",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "inspect",
+        "provider": "feishu",
+        "channel_id": "ch_feishumain01"
+      }
+    },
+    {
+      "name": "upsert a channel through credential reference",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01"
+      }
+    },
+    {
+      "name": "update uses an explicit revision",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 3,
+        "idempotency_key": "config-02"
+      }
+    },
+    {
+      "name": "validate an authorized channel",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "validate",
+        "channel_id": "ch_feishumain01",
+        "expected_revision": 1,
+        "idempotency_key": "validate-01"
+      }
+    },
+    {
+      "name": "enable a validated channel",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "set_enabled",
+        "channel_id": "ch_feishumain01",
+        "enabled": true,
+        "expected_revision": 1,
+        "idempotency_key": "enable-01"
+      }
+    },
+    {
+      "name": "disable a channel explicitly",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "set_enabled",
+        "channel_id": "ch_feishumain01",
+        "enabled": false,
+        "expected_revision": 1,
+        "idempotency_key": "disable-01"
+      }
+    },
+    {
+      "name": "query own approval status",
+      "tool": "configure_im_channel",
+      "valid": true,
+      "arguments": {
+        "operation": "approval_status",
+        "approval_request_id": "apr_example0001"
+      }
+    },
+    {
+      "name": "provider follows MVP scope",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "inspect",
+        "provider": "telegram"
+      }
+    },
+    {
+      "name": "raw app secret stays outside MCP",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01",
+        "app_secret": "test-only-secret-value"
+      }
+    },
+    {
+      "name": "approval flag is server owned",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01",
+        "approved": true
+      }
+    },
+    {
+      "name": "Web approval has a separate API",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "approve",
+        "approval_request_id": "apr_example0001"
+      }
+    },
+    {
+      "name": "owner identity is verified outside arguments",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01",
+        "owner_id": "different-owner"
+      }
+    },
+    {
+      "name": "credential references are opaque",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "file:///private/credential.txt",
+        "expected_revision": 0,
+        "idempotency_key": "config-01"
+      }
+    },
+    {
+      "name": "configuration revision is nonnegative",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": -1,
+        "idempotency_key": "config-01"
+      }
+    },
+    {
+      "name": "validation targets a saved revision",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "validate",
+        "channel_id": "ch_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "validate-01"
+      }
+    },
+    {
+      "name": "enable intent must be explicit",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "set_enabled",
+        "channel_id": "ch_feishumain01",
+        "expected_revision": 1,
+        "idempotency_key": "enable-02"
+      }
+    },
+    {
+      "name": "approval query carries no decision",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "approval_status",
+        "approval_request_id": "apr_example0001",
+        "approve": true
+      }
+    },
+    {
+      "name": "inspection carries no authentication token",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "inspect",
+        "provider": "feishu",
+        "admin_token": "test-only-token-value"
+      }
+    },
+    {
+      "name": "scopes are derived by the service",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01",
+        "requested_scopes": [
+          "administrator"
+        ]
+      }
+    },
+    {
+      "name": "platform endpoint is adapter controlled",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "upsert",
+        "provider": "feishu",
+        "channel_alias": "feishu-main",
+        "display_name": "我的飞书",
+        "app_id": "cli_example123",
+        "credential_ref": "cred_feishumain01",
+        "expected_revision": 0,
+        "idempotency_key": "config-01",
+        "base_url": "http://example.invalid"
+      }
+    },
+    {
+      "name": "channel ID must be an internal identifier",
+      "tool": "configure_im_channel",
+      "valid": false,
+      "arguments": {
+        "operation": "set_enabled",
+        "channel_id": "some-external-chat-id",
+        "enabled": true,
+        "expected_revision": 1,
+        "idempotency_key": "enable-01"
+      }
+    },
+    {
+      "name": "register carries no approval assertion",
+      "tool": "register",
+      "valid": false,
+      "arguments": {
+        "connection_alias": "personal-feishu",
+        "title": "登录问题",
+        "idempotency_key": "register-05",
+        "approved": true
+      }
+    },
+    {
+      "name": "send keeps authorization outside payload",
+      "tool": "send_message_to_user",
+      "valid": false,
+      "arguments": {
+        "session_id": "a7af2b6e-c63b-4e53-9e55-727ef62c9b16",
+        "text": "已完成",
+        "idempotency_key": "result-02",
+        "grant_id": "other-grant"
+      }
+    }
+  ]
+}

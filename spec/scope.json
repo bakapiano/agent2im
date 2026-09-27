@@ -1,0 +1,15 @@
+{
+  "contract_version": "0.2.0",
+  "phase": "mvp-local-acceptance",
+  "agents": ["codex"],
+  "im_providers": ["feishu"],
+  "conversation_kinds": ["direct"],
+  "session_source": "registered-existing",
+  "portal_pages": ["channels", "approvals-and-grants", "connected-sessions"],
+  "mcp_tools": ["register", "send_message_to_user", "wait_for_user_message", "configure_im_channel"],
+  "skills": ["connect-to-im", "configure-im-channel"],
+  "im_commands": ["/sessions", "/switch", "/status", "/send", "/reply", "/stop", "/help"],
+  "first_use_approval": "web-admin",
+  "grant_persistence": "sqlite",
+  "deferred": ["chat-new-session", "managed-runtime", "managed-release", "claude-host", "copilot-host", "additional-im-providers"]
+}
