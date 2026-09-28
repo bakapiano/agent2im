@@ -44,7 +44,7 @@
 
 MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加可信的运行上下文：runtime ID、原生 thread、caller turn、owner 及控制 epoch。模型传入的 Session ID 与可信上下文必须一致。
 
-配置工具先验证 local client 身份；会话工具进一步验证原生 thread。AccessPolicy 读取 Web 批准的持续 Grant，并在每次操作及实际派发时重新检查。
+配置工具验证 local client 身份后直接执行；会话工具核验原生 thread。与 IM 互动时，AccessPolicy 读取 Web 批准的 IM 使用者决定，并在实际派发时重新检查。
 
 返回统一使用：
 
@@ -61,6 +61,8 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 
 用途：注册当前真实 Codex 会话，并关联一个已授权私聊入口。
 
+`connection_alias` 为可选：唯一获批私聊自动选择，多项候选返回 `CONNECTION_SELECTION_REQUIRED`。MCP 从本次宿主元数据识别 thread 和原进程，Broker 启动队列中继读取元数据后直接登记。原 CLI 保持执行权。
+
 ```json
 {
   "connection_alias": "personal-feishu",
@@ -70,7 +72,7 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 }
 ```
 
-`native_thread_id` 为可选一致性校验值。最终身份由受信 runtime descriptor 和 App Server 核对。
+`native_thread_id` 为可选一致性校验值。最终身份来自本次 MCP 宿主元数据及原生会话元数据。
 
 返回示例：
 
@@ -84,7 +86,7 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
     "connection_id": "conversation-personal-feishu",
     "runtime_id": "runtime-login-01",
     "native_thread_id": "01982fd1-f789-73b2-994a-538bf2c7ad12",
-    "control_mode": "attached",
+    "control_mode": "queue_relay",
     "stop_scope": "tracked_resources",
     "active": false,
     "control_epoch": 1
@@ -97,13 +99,13 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 - 相同 verified native identity 在同一 Agent home 中返回同一个 Session；多个进程重复声明所有权时执行冲突核对。
 - 幂等键按 owner 和 runtime 限定，同键不同内容返回 `IDEMPOTENCY_CONFLICT`。
 - 同键重试读取首次操作结果；新的激活意图使用新的幂等键，避免重试覆盖用户后来的选择。
-- 注册使用 Web 已批准的 connection、客户端权限与用户访问 Grant。原始收件人和 App Server 地址由受信控制面维护。
+- 注册自动核验当前原生会话并绑定已批准的 IM 收件人。原始收件人和 App Server 地址由受信控制面维护。
 - `activate=true` 明确请求切换选择；后台续租或重连默认保留用户选择。
 - 重复注册更新标题与连接健康，现有停止 fence 继续有效。
 
 ### 2.2 `send_message_to_user`
 
-用途：由当前 Agent 主动发送一段消息到它已绑定的用户私聊。
+用途：当前 Agent 主动发送消息到绑定的私聊。IM 任务完成时使用 purpose=result 并附带原任务 job_id，服务据此记录明确结果。
 
 ```json
 {
@@ -199,7 +201,7 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 
 ### 2.4 `configure_im_channel`
 
-用途：Agent 帮助配置渠道，复用 Portal 的配置与授权服务。支持 `inspect`、`upsert`、`validate`、`set_enabled`、`approval_status` 五种 operation。
+用途：已认证本地 Agent 直接配置渠道，复用 Portal 的配置服务。操作为 `inspect`、`upsert`、`validate`、`set_enabled`。
 
 配置示例：
 
@@ -216,34 +218,13 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 }
 ```
 
-凭据引用先通过 Portal 安全录入产生。第一次操作需要审批时返回：
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "APPROVAL_REQUIRED",
-    "message": "请管理员在本地 Web Portal 批准此次访问申请。",
-    "retryable": true,
-    "details": {
-      "approval_request_id": "apr_example0001",
-      "portal_url": "http://127.0.0.1:17643/approvals/apr_example0001",
-      "requested_scopes": ["channel.configure"]
-    }
-  }
-}
-```
-
-用户批准后，Agent 先查询本客户端申请的 `approval_status`，再以原幂等键重试。批准的是持续 Grant；当前操作仍校验配置 revision 和渠道身份。
-
-配置成功后分别验证并按用户意图启用连接，后续请求使用当前 Grant。IM 使用者的访问审批与 Agent 配置授权分别进行。完整字段、UI 与安全约束见 [Portal 与审批](portal-and-access.md)。
+凭据引用通过 Portal 安全录入产生。配置操作直接执行，并校验 revision 和幂等键。配置成功后验证并按用户意图启用；IM 使用者是否可以互动由 Web 单独审核。详情见 [Portal 与审批](portal-and-access.md)。
 
 ## 3. 错误码
 
 | 错误码 | 含义/下一步 |
 | --- | --- |
-| `APPROVAL_REQUIRED` | 已产生 Web 待审批申请；批准后重试原操作 |
-| `ACCESS_DENIED` | 当前身份、scope 或资源范围缺少有效授权 |
+| `ACCESS_DENIED` | 目标 IM 使用者尚未获准互动或资格已结束 |
 | `ACCESS_REVOKED` | 授权已撤销，停止对应通道操作 |
 | `CONNECTION_NOT_APPROVED` | 目标私聊用户或路由需要 Web 批准 |
 | `CONFIG_REVISION_CONFLICT` | 读取当前渠道 revision，再提出修改 |
@@ -275,4 +256,4 @@ MCP 接口接收公开 ID 和内容。本地 sidecar 在模型参数之外附加
 
 ## 5. 版本化
 
-公共工具名在 v1 保持稳定。新增可选字段采用向后兼容策略，新增 IM 使用同一规范化对象。调整消息归属、等待消费或停止语义时升级 contract version，并增加行为验收用例。
+公共工具名在 v1 保持稳定。接口统一按当前格式执行，新增 IM 使用同一规范化对象。调整消息归属、等待消费或停止语义时升级 contract version，并增加行为验收用例。

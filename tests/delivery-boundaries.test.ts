@@ -29,15 +29,13 @@ it('question deadline is rechecked after an earlier delivery blocks the worker',
   }finally{release?.();await f.close();}
 });
 
-it.each(['/status','/sessions'] as const)('%s reply keeps its resource scope until actual delivery',async(command)=>{
+it.each(['/status','/sessions'] as const)('%s delivery checks the recipient approval again',async(command)=>{
   const f=await fixture();try{
     const a=await f.connect('Private A');const b=await f.connect('Allowed B',false);await f.broker.tick();
     await f.inbound(command,{messageId:'scoped-control'});
     const inbound=f.store.list('inbox').find(i=>i.platformMessageId==='scoped-control')!;
     const receipt=f.store.list('outbox').find(o=>o.businessKey===`control:${inbound.id}`)!;expect(receipt).toMatchObject({state:'queued'});expect(receipt.text).toContain('Private A');
-    // Simulate Web revoking a broad grant while leaving a narrower valid grant.
     const g=f.store.list('grant').find(g=>g.subject.startsWith('im:'))!;
-    f.store.put('grant',{...g,id:'narrow-fixture',resources:{...g.resources,sessions:[b.session.id],futureSessions:false}});
     f.broker.policy.revoke(g.id,g.revision);await f.broker.tick();
     expect(f.im.sent.some(o=>o.id===receipt.id)).toBe(false);expect(f.store.get('outbox',receipt.id)?.state).toBe('cancelled');
     expect(f.store.get('session',a.session.id)?.conversationId).toBe(b.session.conversationId);

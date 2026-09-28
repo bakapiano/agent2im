@@ -1,4 +1,4 @@
-# 依据与兼容性记录
+# 依据与接口验证
 
 核对日期：2026-09-26。下面把外部已验证接口与本项目设计选择分开记录。
 
@@ -45,7 +45,7 @@
 | `ThreadStartParams.ephemeral` | 可显式选择持久 thread；具体落盘时机待 P0 验收 |
 | `Thread.id` / `Thread.sessionId` | thread 恢复 ID 与 session tree 关联字段分别存在 |
 | `ThreadListParams.sourceKinds` | 默认交互来源筛选；来源枚举包含 appServer/cli/exec 等 |
-| `ThreadResumeParams` | 优先按 threadId 恢复；同一 App Server 内已运行 thread 可重新加入 |
+| `ThreadResumeParams` | 后续原生恢复接口；当前接入使用队列投递 |
 
 Schema 存在代表接口形状可检查；真正的执行范围、并发时序、权限和 Windows 进程效果由 P0 实测确认。
 

@@ -10,8 +10,8 @@ tool_timeout_sec = 360
 required = false
 enabled_tools = ["register", "send_message_to_user", "wait_for_user_message", "configure_im_channel"]
 
-# Each concurrent session uses its own descriptor file. Native Codex tool
-# approval remains separate from Web IM grants. See docs/quickstart.md.
+# The installation descriptor is shared; per-call native metadata selects the
+# runtime automatically. Native approval remains separate from Web IM grants.
 
 # The descriptor points to ACL-protected local credentials and verified runtime
 # identity. Secret values stay outside model arguments and repository files.

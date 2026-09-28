@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import staticFiles from '@fastify/static';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join,resolve } from 'node:path';
 import { randomBytes, scrypt as scryptCallback } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Ajv2020 } from 'ajv/dist/2020.js';
@@ -10,17 +10,15 @@ import type { Broker, Caller } from './broker.js';
 import { AppError, ensure, errorBody } from './core/errors.js';
 import { hash, now, sameSecret, token } from './core/util.js';
 import { validateTool } from './core/validation.js';
-import type { Resources, Scope } from './core/model.js';
+import { appVersion, buildId } from './core/build.js';
 const scrypt=promisify(scryptCallback);
 const ajv=new Ajv2020({strict:false});
 const string={type:'string',minLength:1,maxLength:16384};
 const schemas:Record<string,any>={
   bootstrap:{password:{type:'string',minLength:12,maxLength:1024},bootstrap_token:string}, login:{password:{type:'string',minLength:1,maxLength:1024}},
-  credential:{secret:string,purpose:{enum:['feishu','codex']}},
+  credential:{secret:string,purpose:{enum:['feishu']}},
   enroll:{name:{type:'string',minLength:1,maxLength:120}},
-  attach:{client_id:string,endpoint:string,thread_id:string,home_id:string,cwd:string,workspace:string,server_name:string,credential_ref:string},
-  decision:{revision:{type:'integer',minimum:1},scopes:{type:'array',items:{type:'string'},minItems:1},resources:{type:'object',additionalProperties:false,required:['conversations','workspaces','sessions','futureSessions'],properties:{conversations:{type:'array',items:string},workspaces:{type:'array',items:string},sessions:{type:'array',items:string},futureSessions:{type:'boolean'}}}},
-  revision:{revision:{type:'integer',minimum:1}}, tool:{name:string,args:{type:'object'},runtime_id:string,attempt_id:string},
+  revision:{revision:{type:'integer',minimum:1}}, tool:{name:string,args:{type:'object'},attempt_id:string,native_context:{type:'object',additionalProperties:false,required:['threadId','homeId','owner'],properties:{threadId:{type:'string',pattern:'^[a-fA-F0-9-]{36}$'},homeId:string,owner:{type:'object',additionalProperties:false,required:['pid','createdAt','executable'],properties:{pid:{type:'integer',minimum:1},createdAt:string,executable:string}}}}},
 };
 function body(request:FastifyRequest,name:string,optional:string[]=[]):any {
   const properties=schemas[name];const validate=ajv.compile({type:'object',additionalProperties:false,properties,required:Object.keys(properties).filter(k=>!optional.includes(k))});
@@ -62,21 +60,23 @@ export async function createServers(broker:Broker,installationSecret:string,boot
   portal.get('/api/state',async request=>{admin(request);return {ok:true,data:{channels:broker.channels.list(),requests:store.list('request'),grants:store.list('grant'),conversations:store.list('conversation'),sessions:store.list('session'),workspaces:config.workspaces,audit:store.auditList(),runtime_links:store.list('runtime').map(r=>({id:r.id,clientId:r.clientId,threadId:r.threadId,workspace:r.workspace,connected:broker.runtimes.has(r.id)}))}};});
   portal.post('/api/credentials',async request=>{admin(request,true);rate('credential',30);const b=body(request,'credential');const ref=await broker.vault.save(b.secret,b.purpose);store.audit('credential.saved','web-admin',ref,{purpose:b.purpose});return {ok:true,data:{credential_ref:ref}};});
   portal.post('/api/channels',async request=>{admin(request,true);validateTool('configure_im_channel',request.body);return {ok:true,data:await broker.channels.execute(request.body as any)};});
-  portal.post<{Params:{id:string}}>('/api/requests/:id/approve',async request=>{admin(request,true);const b=body(request,'decision');return {ok:true,data:broker.policy.approve(request.params.id,b.revision,b.scopes as Scope[],b.resources as Resources)};});
+  portal.post<{Params:{id:string}}>('/api/requests/:id/approve',async request=>{admin(request,true);const b=body(request,'revision');return {ok:true,data:broker.policy.approve(request.params.id,b.revision)};});
   portal.post<{Params:{id:string}}>('/api/requests/:id/deny',async request=>{admin(request,true);const b=body(request,'revision');broker.policy.deny(request.params.id,b.revision);return {ok:true};});
   portal.post<{Params:{id:string}}>('/api/grants/:id/revoke',async request=>{admin(request,true);const b=body(request,'revision');broker.policy.revoke(request.params.id,b.revision);return {ok:true};});
   portal.get<{Params:{id:string}}>('/api/sessions/:id',async request=>{admin(request);const s=store.get('session',request.params.id);ensure(s,'SESSION_NOT_FOUND','会话不存在。',404);return {ok:true,data:await broker.status(s)};});
   if(existsSync(join(config.webRoot,'index.html'))) {await portal.register(staticFiles,{root:config.webRoot});portal.get('/',async(_,reply)=>reply.sendFile('index.html'));}
   else portal.get('/',async()=>({message:'请运行 pnpm build 生成 Web Portal。'}));
   function local(request:FastifyRequest){ensure(!request.headers.origin&&typeof request.headers.authorization==='string'&&sameSecret(request.headers.authorization,`Bearer ${installationSecret}`),'INSTALLATION_UNAUTHORIZED','本地安装身份无效。',401);}
-  agent.get('/health',async()=>({ok:true,version:'0.2.0'}));
+  agent.get('/health',async()=>({ok:true,version:appVersion,buildId}));
   agent.post('/local/enroll',async request=>{local(request);const b=body(request,'enroll');return {ok:true,data:broker.enroll(b.name,'local-os-user')};});
-  agent.post('/local/attach',async request=>{local(request);const b=body(request,'attach',['credential_ref']);return {ok:true,data:await broker.attach(b.client_id,{endpoint:b.endpoint,threadId:b.thread_id,homeId:b.home_id,cwd:b.cwd,workspace:b.workspace,serverName:b.server_name,credentialRef:b.credential_ref})};});
   agent.post('/rpc/tool',async(request,reply)=>{
     ensure(!request.headers.origin,'AGENT_AUDIENCE_ONLY','Agent RPC 使用本地进程身份。',403);rate('rpc',600);
-    const b=body(request,'tool',['runtime_id']);const authorization=request.headers.authorization??'';const split=authorization.match(/^Bearer ([^:]+):(.+)$/);ensure(split,'CLIENT_UNAUTHORIZED','客户端凭据缺失。',401);
-    const caller:Caller={clientId:split[1],secret:split[2],runtimeId:b.runtime_id,attemptId:b.attempt_id};const controller=new AbortController();const onClose=()=>{if(!reply.raw.writableEnded)controller.abort();};reply.raw.on('close',onClose);
-    try{return {ok:true,data:await broker.tool(b.name,b.args,caller,controller.signal)};}finally{reply.raw.off('close',onClose);}
+    const b=body(request,'tool',['native_context']);const authorization=request.headers.authorization??'';const split=authorization.match(/^Bearer ([^:]+):(.+)$/);ensure(split,'CLIENT_UNAUTHORIZED','客户端凭据缺失。',401);
+    const caller:Caller={clientId:split[1],secret:split[2],attemptId:b.attempt_id,nativeContext:b.native_context};const controller=new AbortController();const onClose=()=>{if(!reply.raw.writableEnded)controller.abort();};reply.raw.on('close',onClose);
+    try{
+      const data=await broker.tool(b.name,b.args,caller,controller.signal);
+      return {ok:true,data};
+    }finally{reply.raw.off('close',onClose);}
   });
   return {portal,agent,async listen(){await portal.listen({host:'127.0.0.1',port:config.portalPort});try{await agent.listen({host:'127.0.0.1',port:config.agentPort});}catch(e){await portal.close();throw e;}},async close(){await Promise.all([portal.close(),agent.close()]);}};
 }

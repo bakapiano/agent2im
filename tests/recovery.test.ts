@@ -34,9 +34,9 @@ it.each(['stopped','stop_incomplete','stopping'] as const)('runtime disconnect p
   const f=await fixture();try{const a=await f.connect();const s=f.store.get('session',a.session.id)!;s.state=state;f.store.put('session',s);a.runtime.emit('connection/closed',{});expect(f.store.get('session',s.id)?.state).toBe(state);expect(f.broker.runtimes.has(s.runtimeId)).toBe(false);}finally{await f.close();}
 });
 it('MCP call begun before stop cannot enter a reopened session epoch',async()=>{
-  const f=await fixture();let release!:()=>void;try{const a=await f.connect();a.runtime.witnessEntered=false;a.runtime.witnessGate=new Promise<void>(r=>{release=r;});
+  const f=await fixture();let release!:()=>void;try{const a=await f.connect();a.runtime.inspectEntered=false;a.runtime.inspectGate=new Promise<void>(r=>{release=r;});
     const pending=f.broker.tool('send_message_to_user',{session_id:a.session.id,text:'stale message',idempotency_key:'stale'},a.caller).then(value=>({value}),error=>({error}));
-    const deadline=Date.now()+1000;while(!a.runtime.witnessEntered&&Date.now()<deadline)await sleep(10);expect(a.runtime.witnessEntered).toBe(true);
+    const deadline=Date.now()+1000;while(!a.runtime.inspectEntered&&Date.now()<deadline)await sleep(10);expect(a.runtime.inspectEntered).toBe(true);
     await f.broker.stop(a.session.id);await f.inbound('new task');expect(f.store.get('session',a.session.id)?.state).toBe('ready');release();
     expect(await pending).toMatchObject({error:{code:'STALE_CONTROL_EPOCH'}});expect(f.store.list('outbox').some(o=>o.text.includes('stale message'))).toBe(false);
   }finally{release?.();await f.close();}

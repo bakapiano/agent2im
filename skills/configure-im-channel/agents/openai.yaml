@@ -1,13 +1,13 @@
 interface:
   display_name: "Configure IM Channel"
-  short_description: "Configure IM channels with Web-approved access"
-  default_prompt: "Use $configure-im-channel to help configure my Feishu channel and guide me through first-use Web approval."
+  short_description: "Configure IM channels from the local client"
+  default_prompt: "Use $configure-im-channel to configure, validate, and enable my Feishu channel."
 
 dependencies:
   tools:
     - type: "mcp"
       value: "agent-to-im"
-      description: "Configure an authorized IM channel and inspect the current client's approval request."
+      description: "Inspect, save, validate, and activate IM channel configuration."
 
 policy:
   allow_implicit_invocation: true

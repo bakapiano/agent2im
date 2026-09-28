@@ -1,6 +1,16 @@
 {
   "cases": [
     {
+      "name": "register automatically selects the sole approved chat",
+      "tool": "register",
+      "valid": true,
+      "arguments": {
+        "title": "自动连接",
+        "idempotency_key": "auto-connect",
+        "activate": true
+      }
+    },
+    {
       "name": "register approved connection",
       "tool": "register",
       "valid": true,
@@ -261,15 +271,6 @@
       }
     },
     {
-      "name": "query own approval status",
-      "tool": "configure_im_channel",
-      "valid": true,
-      "arguments": {
-        "operation": "approval_status",
-        "approval_request_id": "apr_example0001"
-      }
-    },
-    {
       "name": "provider follows MVP scope",
       "tool": "configure_im_channel",
       "valid": false,
@@ -388,16 +389,6 @@
       }
     },
     {
-      "name": "approval query carries no decision",
-      "tool": "configure_im_channel",
-      "valid": false,
-      "arguments": {
-        "operation": "approval_status",
-        "approval_request_id": "apr_example0001",
-        "approve": true
-      }
-    },
-    {
       "name": "inspection carries no authentication token",
       "tool": "configure_im_channel",
       "valid": false,
@@ -408,7 +399,7 @@
       }
     },
     {
-      "name": "scopes are derived by the service",
+      "name": "configuration rejects model supplied admin authority",
       "tool": "configure_im_channel",
       "valid": false,
       "arguments": {
@@ -420,9 +411,7 @@
         "credential_ref": "cred_feishumain01",
         "expected_revision": 0,
         "idempotency_key": "config-01",
-        "requested_scopes": [
-          "administrator"
-        ]
+        "admin": true
       }
     },
     {

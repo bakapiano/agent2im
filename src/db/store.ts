@@ -20,19 +20,16 @@ export class Store {
   constructor(filename: string) {
     if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true, mode: 0o700 });
     this.sqlite = new Database(filename);
-    this.sqlite.pragma('journal_mode = WAL'); this.sqlite.pragma('foreign_keys = ON'); this.sqlite.pragma('busy_timeout = 5000');
     const version = this.sqlite.pragma('user_version', { simple: true }) as number;
-    if (version > 2) { this.sqlite.close(); throw new AppError('DATABASE_VERSION_UNSUPPORTED', '数据库版本高于当前程序，请使用兼容版本。'); }
+    if (version !== 0 && version !== 4) { this.sqlite.close(); throw new AppError('DATABASE_VERSION_UNSUPPORTED', '数据库格式与当前版本不一致。'); }
+    this.sqlite.pragma('journal_mode = WAL'); this.sqlite.pragma('foreign_keys = ON'); this.sqlite.pragma('busy_timeout = 5000');
     this.sqlite.transaction(() => {
       this.sqlite.exec(`CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)), revision INTEGER NOT NULL DEFAULT 1, sequence INTEGER NOT NULL, PRIMARY KEY(kind,id));
       CREATE TABLE IF NOT EXISTS unique_claims (namespace TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(namespace,key));
       CREATE TABLE IF NOT EXISTS audit_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, action TEXT NOT NULL, subject TEXT NOT NULL, target TEXT NOT NULL, details TEXT NOT NULL CHECK(json_valid(details)));
       `);
-      const columns = this.sqlite.pragma('table_info(records)') as Array<{ name: string }>;
-      if (!columns.some(c => c.name === 'sequence')) {
-        this.sqlite.exec('ALTER TABLE records ADD COLUMN sequence INTEGER; UPDATE records SET sequence=rowid;');
-      }
-      this.sqlite.exec('CREATE UNIQUE INDEX IF NOT EXISTS records_sequence ON records(sequence); PRAGMA user_version = 2;');
+      this.sqlite.exec('CREATE UNIQUE INDEX IF NOT EXISTS records_sequence ON records(sequence);');
+      this.sqlite.exec('PRAGMA user_version = 4;');
     })();
     this.db = drizzle(this.sqlite);
   }

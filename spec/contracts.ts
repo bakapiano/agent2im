@@ -161,7 +161,7 @@ export interface RuntimeCapabilities {
 export interface RuntimeHandle {
   runtimeId: RuntimeId;
   native: NativeIdentity;
-  controlMode: "attached";
+  controlMode: "queue_relay";
   endpointRef: string;
   processGeneration: string;
   capabilities: RuntimeCapabilities;
@@ -256,7 +256,7 @@ export interface AgentRuntimeAdapter {
 }
 
 export interface RegisterArgs {
-  connection_alias: string;
+  connection_alias?: string;
   title: string;
   idempotency_key: string;
   native_thread_id?: string;
@@ -270,13 +270,14 @@ export interface RegisterResult {
   connection_id: ConversationId;
   runtime_id: RuntimeId;
   native_thread_id: string;
-  control_mode: "attached";
+  control_mode: "queue_relay";
   stop_scope: StopScope;
   active: boolean;
   control_epoch: number;
 }
 
 export interface SendMessageArgs {
+  job_id?: string;
   session_id: SessionId;
   text: string;
   idempotency_key: string;
@@ -335,34 +336,14 @@ export interface VerifiedLocalClient {
   verifiedAt: IsoDateTime;
 }
 
-export type AccessScope =
-  | "channel.read"
-  | "channel.configure"
-  | "session.register"
-  | "session.read"
-  | "session.message"
-  | "session.stop"
-  | "message.send";
-
-export type AccessSubject =
-  | { kind: "agent_client"; clientId: string; installationId: string; osUserId: string }
-  | { kind: "im_user"; identity: PlatformIdentity };
-
-export interface AccessResourceFilter {
-  ownerId: PrincipalId;
-  conversationIds: ConversationId[];
-  workspaceAliases: string[];
-  sessionIds?: SessionId[];
-  includeFutureOwnedSessions: boolean;
-}
+export type AccessSubject = { kind: "im_user"; identity: PlatformIdentity };
 
 export interface AccessGrant {
   grantId: string;
   subject: AccessSubject;
   channelId: string;
   channelIdentityVersion: number;
-  scopes: AccessScope[];
-  resources: AccessResourceFilter;
+  conversationId: ConversationId;
   status: "active" | "revoked";
   revision: number;
   approvedBy: string;
@@ -382,8 +363,7 @@ export interface AccessRequest {
   requestId: string;
   subject: AccessSubject;
   channelId: string;
-  requestedScopes: AccessScope[];
-  proposalDigest?: string;
+  conversationId: ConversationId;
   revision: number;
   status: "pending" | "approved" | "denied" | "expired";
   requestedAt: IsoDateTime;
@@ -421,17 +401,11 @@ export type ConfigureImChannelArgs =
       enabled: boolean;
       expected_revision: number;
       idempotency_key: string;
-    }
-  | { operation: "approval_status"; approval_request_id: string };
+    };
 
 export type ConfigureImChannelResult =
   | { operation: "inspect"; provider: string; requirements: string[]; channels: SanitizedImChannel[] }
-  | { operation: "upsert" | "validate" | "set_enabled"; channel: SanitizedImChannel; diagnostics: string[] }
-  | {
-      operation: "approval_status";
-      approval_request_id: string;
-      status: "pending" | "approved" | "denied" | "expired" | "revoked";
-    };
+  | { operation: "upsert" | "validate" | "set_enabled"; channel: SanitizedImChannel; diagnostics: string[] };
 
 /** Constructed by the Web authentication/CSRF middleware, outside request bodies. */
 export interface VerifiedWebAdmin {
@@ -446,8 +420,6 @@ export interface WebApprovalService {
   approve(
     requestId: string,
     expectedRevision: number,
-    scopes: AccessScope[],
-    resources: AccessResourceFilter,
     admin: VerifiedWebAdmin,
   ): Promise<AccessGrant>;
   deny(requestId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<void>;
