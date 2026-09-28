@@ -1,21 +1,87 @@
 import { afterEach, expect, it } from 'vitest';
 import { createServers } from '../src/server.js';
 import { fixture } from './fixture.js';
-let f:Awaited<ReturnType<typeof fixture>>;let servers:Awaited<ReturnType<typeof createServers>>;
-afterEach(async()=>{await servers?.close();await f?.close();});
-it('separates admin/local/client audiences, checks CSRF, and persists grants',async()=>{
-  f=await fixture();servers=await createServers(f.broker,'fixture-install','fixture-bootstrap');const host='127.0.0.1:18643';const origin=`http://${host}`;
-  expect((await servers.portal.inject({url:'/api/state',headers:{host}})).statusCode).toBe(401);
-  expect((await servers.portal.inject({url:'/api/auth',headers:{host:'evil.invalid'}})).statusCode).toBe(403);
-  expect((await servers.portal.inject({url:'/api/auth',headers:{host,origin:'https://evil.invalid'}})).statusCode).toBe(403);
-  const login=await servers.portal.inject({method:'POST',url:'/api/bootstrap',headers:{host,origin},payload:{bootstrap_token:'fixture-bootstrap',password:'fixture-password-1234'}});expect(login.statusCode).toBe(200);
-  const cookie=login.cookies[0].value;const csrf=login.json().data.csrf;const headers={host,origin,cookie:`ati_admin=${cookie}`,'x-csrf-token':csrf};
-  expect((await servers.portal.inject({url:'/api/state',headers})).statusCode).toBe(200);
-  expect((await servers.portal.inject({method:'POST',url:'/api/credentials',headers:{...headers,'x-csrf-token':'wrong'},payload:{secret:'s',purpose:'feishu'}})).statusCode).toBe(403);
-  const secretResponse=await servers.portal.inject({method:'POST',url:'/api/credentials',headers,payload:{secret:'test-sensitive-secret',purpose:'feishu'}});expect(secretResponse.statusCode).toBe(200);expect(secretResponse.body).not.toContain('test-sensitive-secret');
-  await f.inbound('/sessions');const req=f.store.list('request')[0];const approved=await servers.portal.inject({method:'POST',url:`/api/requests/${req.id}/approve`,headers,payload:{revision:req.revision}});expect(approved.statusCode).toBe(200);expect(f.store.list('grant')).toHaveLength(1);
-  const crossed=await servers.agent.inject({url:'/local/enroll',method:'POST',headers:{host:'127.0.0.1:18642',cookie:headers.cookie},payload:{name:'x'}});expect(crossed.statusCode).toBe(401);
-  const client=await servers.agent.inject({url:'/local/enroll',method:'POST',headers:{host:'127.0.0.1:18642',authorization:'Bearer fixture-install'},payload:{name:'fixture-client'}});expect(client.statusCode).toBe(200);
-  const c=client.json().data;const agentApproval=await servers.agent.inject({url:`/api/requests/${req.id}/approve`,method:'POST',headers:{host:'127.0.0.1:18642',authorization:`Bearer ${c.client_id}:${c.secret}`},payload:{}});expect(agentApproval.statusCode).toBe(404);
-  const leaked=await servers.portal.inject({url:'/api/state',headers});expect(leaked.body).not.toContain('test-sensitive-secret');expect(leaked.body).not.toContain(c.secret);
+let f: Awaited<ReturnType<typeof fixture>>;
+let servers: Awaited<ReturnType<typeof createServers>>;
+afterEach(async () => {
+  await servers?.close();
+  await f?.close();
+});
+it('separates admin/local/client audiences, checks CSRF, and persists grants', async () => {
+  f = await fixture();
+  servers = await createServers(f.broker, 'fixture-install', 'fixture-bootstrap');
+  const host = '127.0.0.1:18643';
+  const origin = `http://${host}`;
+  expect((await servers.portal.inject({ url: '/api/state', headers: { host } })).statusCode).toBe(401);
+  expect(
+    (await servers.portal.inject({ url: '/api/auth', headers: { host: 'evil.invalid' } })).statusCode,
+  ).toBe(403);
+  expect(
+    (await servers.portal.inject({ url: '/api/auth', headers: { host, origin: 'https://evil.invalid' } }))
+      .statusCode,
+  ).toBe(403);
+  const login = await servers.portal.inject({
+    method: 'POST',
+    url: '/api/bootstrap',
+    headers: { host, origin },
+    payload: { bootstrap_token: 'fixture-bootstrap', password: 'fixture-password-1234' },
+  });
+  expect(login.statusCode).toBe(200);
+  const cookie = login.cookies[0].value;
+  const csrf = login.json().data.csrf;
+  const headers = { host, origin, cookie: `ati_admin=${cookie}`, 'x-csrf-token': csrf };
+  expect((await servers.portal.inject({ url: '/api/state', headers })).statusCode).toBe(200);
+  expect(
+    (
+      await servers.portal.inject({
+        method: 'POST',
+        url: '/api/credentials',
+        headers: { ...headers, 'x-csrf-token': 'wrong' },
+        payload: { secret: 's', purpose: 'feishu' },
+      })
+    ).statusCode,
+  ).toBe(403);
+  const secretResponse = await servers.portal.inject({
+    method: 'POST',
+    url: '/api/credentials',
+    headers,
+    payload: { secret: 'test-sensitive-secret', purpose: 'feishu' },
+  });
+  expect(secretResponse.statusCode).toBe(200);
+  expect(secretResponse.body).not.toContain('test-sensitive-secret');
+  await f.inbound('/sessions');
+  const req = f.store.list('request')[0];
+  const approved = await servers.portal.inject({
+    method: 'POST',
+    url: `/api/requests/${req.id}/approve`,
+    headers,
+    payload: { revision: req.revision },
+  });
+  expect(approved.statusCode).toBe(200);
+  expect(f.store.list('grant')).toHaveLength(1);
+  const crossed = await servers.agent.inject({
+    url: '/local/enroll',
+    method: 'POST',
+    headers: { host: '127.0.0.1:18642', cookie: headers.cookie },
+    payload: { name: 'x' },
+  });
+  expect(crossed.statusCode).toBe(401);
+  const client = await servers.agent.inject({
+    url: '/local/enroll',
+    method: 'POST',
+    headers: { host: '127.0.0.1:18642', authorization: 'Bearer fixture-install' },
+    payload: { name: 'fixture-client' },
+  });
+  expect(client.statusCode).toBe(200);
+  const c = client.json().data;
+  const agentApproval = await servers.agent.inject({
+    url: `/api/requests/${req.id}/approve`,
+    method: 'POST',
+    headers: { host: '127.0.0.1:18642', authorization: `Bearer ${c.client_id}:${c.secret}` },
+    payload: {},
+  });
+  expect(agentApproval.statusCode).toBe(404);
+  const leaked = await servers.portal.inject({ url: '/api/state', headers });
+  expect(leaked.body).not.toContain('test-sensitive-secret');
+  expect(leaked.body).not.toContain(c.secret);
 });

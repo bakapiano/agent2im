@@ -1,0 +1,23 @@
+{
+  "name": "agent-to-im",
+  "version": "0.3.0",
+  "description": "Connect the current Codex session to an approved IM user.",
+  "author": {
+    "name": "bakapiano"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent to IM",
+    "shortDescription": "Connect Codex to your Feishu private chat.",
+    "longDescription": "Register the current native session, send IM messages, wait for replies, and configure channels through a local portal. IM users are approved in the portal.",
+    "developerName": "bakapiano",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Use $connect-to-im to connect this session.",
+      "Use $configure-im-channel to configure my IM channel."
+    ]
+  },
+  "mcpServers": "./.mcp.json",
+  "repository": "https://github.com/bakapiano/agent2im"
+}

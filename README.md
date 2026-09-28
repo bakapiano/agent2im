@@ -4,7 +4,8 @@
 
 ## 当前能力
 
-- Codex CLI + 飞书私聊；IM/Agent Adapter 接口为后续扩展保留。
+- Codex Plugin 打包 MCP、两份 Skill、Broker 与 Portal；首个组合为 Codex CLI + 飞书私聊。
+- IM 与 Code CLI 按独立平台目录和注册表组织；微信、QQ、Claude、GHCP 带明确扩展状态。
 - 当前会话直接注册、列出/切换 session、提交任务。
 - Agent 主动发送、提问并在原工具调用中接收回答。
 - IM 任务携带 job_id，结果由 Agent 通过 MCP 明确回传。
@@ -16,7 +17,7 @@
 
 ## 使用
 
-安装 MCP 与两份 Skill 后，在当前 Codex 对话调用：
+安装 Codex Plugin 后，在当前 Codex 对话调用：
 
 ```text
 $connect-to-im
@@ -33,11 +34,13 @@ $connect-to-im
 /stop
 ```
 
-原 CLI 保持打开以消费原生队列。接入只使用当前格式；新库初始化为 schema 4，其他数据格式直接报错。
+原 CLI 保持打开以消费原生队列。接入只使用当前格式；新库初始化为 schema 5，其他数据格式直接报错。
 
 ## 文档
 
 - [本地安装与使用](docs/quickstart.md)
+- [Codex Plugin 构建与安装](docs/plugin.md)
+- [平台目录与扩展格式](docs/extensions.md)
 - [架构](docs/architecture.md)
 - [协议](docs/protocol.md)
 - [Portal 与 IM 使用者审批](docs/portal-and-access.md)
@@ -50,4 +53,4 @@ $connect-to-im
 - [MCP 配置示例](examples/codex-mcp.example.toml)
 - [领域契约](spec/contracts.ts)
 
-CLI 命令：serve、enroll、mcp、install-local、rollback-local、doctor、version。验证：`pwsh -NoProfile -File ./scripts/project.ps1 check`。
+CLI 命令：serve、enroll、mcp、portal、install-local、rollback-local、doctor、version。插件构建：`pnpm package:plugin`；验证：`pwsh -NoProfile -File ./scripts/project.ps1 check`；统一格式：`pnpm format`。

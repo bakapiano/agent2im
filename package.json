@@ -1,15 +1,22 @@
 {
   "name": "agent-to-im",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24 <25" },
-  "bin": { "agent-to-im": "dist/cli.js" },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "bin": {
+    "agent-to-im": "dist/cli.js"
+  },
   "scripts": {
     "dev": "tsx src/cli.ts serve",
     "dev:web": "vite --config vite.config.ts",
     "build": "tsc --noEmit && vite build && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
+    "format": "prettier --write src tests spec plugins scripts/*.mjs *.json *.ts",
+    "format:check": "prettier --check src tests spec plugins scripts/*.mjs *.json *.ts",
+    "package:plugin": "pnpm build && node scripts/package-plugin.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
@@ -38,10 +45,16 @@
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.1.1",
     "esbuild": "0.28.2",
+    "prettier": "3.9.9",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.1",
     "vitest": "5.0.2"
   },
-  "pnpm": { "onlyBuiltDependencies": ["better-sqlite3", "esbuild"] }
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
 }

@@ -1,40 +1,16 @@
 {
-  "contract_version": "0.2.0",
+  "contract_version": "0.3.0",
   "phase": "mvp-local-acceptance",
-  "agents": [
-    "codex"
-  ],
-  "im_providers": [
-    "feishu"
-  ],
-  "conversation_kinds": [
-    "direct"
-  ],
+  "agents": ["codex"],
+  "im_providers": ["feishu"],
+  "provider_catalog": { "im": ["feishu", "wechat", "qq"], "code_cli": ["codex", "claude", "ghcp"] },
+  "distribution": "codex-plugin-windows-x64",
+  "conversation_kinds": ["direct"],
   "session_source": "registered-existing",
-  "portal_pages": [
-    "channels",
-    "approvals-and-grants",
-    "connected-sessions"
-  ],
-  "mcp_tools": [
-    "register",
-    "send_message_to_user",
-    "wait_for_user_message",
-    "configure_im_channel"
-  ],
-  "skills": [
-    "connect-to-im",
-    "configure-im-channel"
-  ],
-  "im_commands": [
-    "/sessions",
-    "/switch",
-    "/status",
-    "/send",
-    "/reply",
-    "/stop",
-    "/help"
-  ],
+  "portal_pages": ["channels", "approvals-and-grants", "connected-sessions"],
+  "mcp_tools": ["register", "send_message_to_user", "wait_for_user_message", "configure_im_channel"],
+  "skills": ["connect-to-im", "configure-im-channel"],
+  "im_commands": ["/sessions", "/switch", "/status", "/send", "/reply", "/stop", "/help"],
   "first_use_approval": "im-user-web-approval",
   "grant_persistence": "sqlite",
   "deferred": [

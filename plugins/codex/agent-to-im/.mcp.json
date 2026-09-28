@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agent-to-im": {
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-NonInteractive", "-File", "./scripts/mcp.ps1"],
+      "cwd": ".",
+      "env_vars": ["CODEX_HOME", "AGENT_TO_IM_DATA_DIR"],
+      "startup_timeout_sec": 15,
+      "tool_timeout_sec": 360
+    }
+  }
+}

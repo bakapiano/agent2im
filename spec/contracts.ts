@@ -1,5 +1,5 @@
 /**
- * agent-to-IM v0.2 design contracts. Implementation follows docs/implementation-plan.md.
+ * agent-to-IM v0.3 design contracts. Implementation follows docs/implementation-plan.md.
  * These interfaces describe business state; platform SDK types stay in adapters.
  */
 
@@ -12,21 +12,21 @@ export type IsoDateTime = string;
 export type PlatformId = string;
 
 export type SessionState =
-  | "ready"
-  | "running"
-  | "waiting_user"
-  | "waiting_approval"
-  | "stopping"
-  | "stopped"
-  | "offline"
-  | "error"
-  | "stop_incomplete";
+  | 'ready'
+  | 'running'
+  | 'waiting_user'
+  | 'waiting_approval'
+  | 'stopping'
+  | 'stopped'
+  | 'offline'
+  | 'error'
+  | 'stop_incomplete';
 
-export type StopScope = "owned_process_tree" | "tracked_resources";
-export type RuntimeHealth = "online" | "offline" | "reconciling";
-export type NativeHistoryState = "pending_persistence" | "resumable" | "missing";
-export type RuntimeOwner = "none" | "broker" | "native_client" | "unknown";
-export type SessionWakePolicy = "on_user_message" | "manual_registration";
+export type StopScope = 'owned_process_tree' | 'tracked_resources';
+export type RuntimeHealth = 'online' | 'offline' | 'reconciling';
+export type NativeHistoryState = 'pending_persistence' | 'resumable' | 'missing';
+export type RuntimeOwner = 'none' | 'broker' | 'native_client' | 'unknown';
+export type SessionWakePolicy = 'on_user_message' | 'manual_registration';
 
 export interface PlatformIdentity {
   platform: PlatformId;
@@ -40,7 +40,7 @@ export interface ConversationAddress {
   accountId: string;
   tenantId: string;
   chatId: string;
-  kind: "direct" | "group" | "thread";
+  kind: 'direct' | 'group' | 'thread';
   threadId?: string;
 }
 
@@ -53,7 +53,7 @@ export interface AuthenticatedInboundEvent {
   replyToPlatformMessageId?: string;
   occurredAt: IsoDateTime;
   receivedAt: IsoDateTime;
-  authentication: "platform_gateway" | "verified_webhook";
+  authentication: 'platform_gateway' | 'verified_webhook';
   rawEvidenceRef: string;
 }
 
@@ -110,13 +110,13 @@ export interface VerifiedCallerContext {
 }
 
 export interface ImCapabilities {
-  receiveMode: "events" | "poll";
+  receiveMode: 'events' | 'poll';
   directMessages: boolean;
   groupMessages: boolean;
   replyReferences: boolean;
   providerIdempotency: boolean;
   maxTextCharacters: number;
-  proactiveSend: "allowed" | "windowed";
+  proactiveSend: 'allowed' | 'windowed';
 }
 
 export interface OutboundText {
@@ -126,16 +126,16 @@ export interface OutboundText {
   controlEpoch: number;
   authorization: AuthorizationStamp;
   text: string;
-  purpose: "notice" | "progress" | "result" | "question" | "control";
+  purpose: 'notice' | 'progress' | 'result' | 'question' | 'control';
   replyToPlatformMessageId?: string;
   nativeTurnId?: string;
 }
 
 export type DeliveryReceipt =
-  | { status: "delivered"; platformMessageId: string; sentAt: IsoDateTime }
-  | { status: "retryable"; retryAfterMs?: number; reason: string }
-  | { status: "unknown"; reason: string }
-  | { status: "failed"; reason: string };
+  | { status: 'delivered'; platformMessageId: string; sentAt: IsoDateTime }
+  | { status: 'retryable'; retryAfterMs?: number; reason: string }
+  | { status: 'unknown'; reason: string }
+  | { status: 'failed'; reason: string };
 
 export interface ImAdapter {
   readonly platform: PlatformId;
@@ -161,7 +161,7 @@ export interface RuntimeCapabilities {
 export interface RuntimeHandle {
   runtimeId: RuntimeId;
   native: NativeIdentity;
-  controlMode: "queue_relay";
+  controlMode: 'queue_relay';
   endpointRef: string;
   processGeneration: string;
   capabilities: RuntimeCapabilities;
@@ -184,7 +184,7 @@ export interface OwnedResource {
   controlEpoch: number;
   nativeThreadId: string;
   parentResourceId?: string;
-  kind: "turn" | "agent" | "terminal" | "process" | "goal" | "external_job";
+  kind: 'turn' | 'agent' | 'terminal' | 'process' | 'goal' | 'external_job';
   cancelHandleRef: string;
   ownershipEvidenceRef: string;
 }
@@ -201,9 +201,9 @@ export interface AcceptedTask {
 }
 
 export type DispatchReceipt =
-  | { status: "accepted"; nativeTurnId?: string; nativeQueueId?: string }
-  | { status: "unknown"; reconciliationRef: string }
-  | { status: "rejected"; reason: string };
+  | { status: 'accepted'; nativeTurnId?: string; nativeQueueId?: string }
+  | { status: 'unknown'; reconciliationRef: string }
+  | { status: 'rejected'; reason: string };
 
 export interface RuntimeEvent {
   eventId: string;
@@ -211,14 +211,14 @@ export interface RuntimeEvent {
   nativeThreadId: string;
   nativeTurnId?: string;
   type:
-    | "turn_started"
-    | "turn_completed"
-    | "queue_changed"
-    | "final_message"
-    | "approval_pending"
-    | "resource_created"
-    | "resource_ended"
-    | "runtime_closed";
+    | 'turn_started'
+    | 'turn_completed'
+    | 'queue_changed'
+    | 'final_message'
+    | 'approval_pending'
+    | 'resource_created'
+    | 'resource_ended'
+    | 'runtime_closed';
   payload: Readonly<Record<string, unknown>>;
   observedAt: IsoDateTime;
 }
@@ -270,7 +270,7 @@ export interface RegisterResult {
   connection_id: ConversationId;
   runtime_id: RuntimeId;
   native_thread_id: string;
-  control_mode: "queue_relay";
+  control_mode: 'queue_relay';
   stop_scope: StopScope;
   active: boolean;
   control_epoch: number;
@@ -281,14 +281,14 @@ export interface SendMessageArgs {
   session_id: SessionId;
   text: string;
   idempotency_key: string;
-  purpose?: "notice" | "progress" | "result";
+  purpose?: 'notice' | 'progress' | 'result';
 }
 
 export interface SendMessageResult {
   message_id: MessageId;
   session_id: SessionId;
   conversation_id: ConversationId;
-  delivery_status: "queued" | "delivered" | "unknown";
+  delivery_status: 'queued' | 'delivered' | 'unknown';
   platform_message_id?: string;
 }
 
@@ -297,8 +297,8 @@ export type WaitForUserArgs = {
   request_key: string;
   timeout_seconds?: number;
 } & (
-  | { mode: "ask"; prompt: string; reply_ttl_seconds?: number }
-  | { mode: "resume"; prompt?: never; reply_ttl_seconds?: never }
+  | { mode: 'ask'; prompt: string; reply_ttl_seconds?: number }
+  | { mode: 'resume'; prompt?: never; reply_ttl_seconds?: never }
 );
 
 export interface UserReply {
@@ -314,11 +314,11 @@ export type WaitForUserResult = {
   request_id: string;
   question_short_id: string;
 } & (
-  | { status: "answered"; reply: UserReply }
-  | { status: "waiting"; expires_at: IsoDateTime }
-  | { status: "expired" }
-  | { status: "cancelled"; reason: string }
-  | { status: "delivery_failed"; reason: string }
+  | { status: 'answered'; reply: UserReply }
+  | { status: 'waiting'; expires_at: IsoDateTime }
+  | { status: 'expired' }
+  | { status: 'cancelled'; reason: string }
+  | { status: 'delivery_failed'; reason: string }
 );
 
 export interface ToolError {
@@ -336,7 +336,7 @@ export interface VerifiedLocalClient {
   verifiedAt: IsoDateTime;
 }
 
-export type AccessSubject = { kind: "im_user"; identity: PlatformIdentity };
+export type AccessSubject = { kind: 'im_user'; identity: PlatformIdentity };
 
 export interface AccessGrant {
   grantId: string;
@@ -344,7 +344,7 @@ export interface AccessGrant {
   channelId: string;
   channelIdentityVersion: number;
   conversationId: ConversationId;
-  status: "active" | "revoked";
+  status: 'active' | 'revoked';
   revision: number;
   approvedBy: string;
   approvedAt: IsoDateTime;
@@ -365,7 +365,7 @@ export interface AccessRequest {
   channelId: string;
   conversationId: ConversationId;
   revision: number;
-  status: "pending" | "approved" | "denied" | "expired";
+  status: 'pending' | 'approved' | 'denied' | 'expired';
   requestedAt: IsoDateTime;
   expiresAt: IsoDateTime;
 }
@@ -379,14 +379,14 @@ export interface SanitizedImChannel {
   credential_configured: boolean;
   revision: number;
   identity_version: number;
-  state: "draft" | "validated" | "enabled" | "disabled" | "error";
+  state: 'draft' | 'validated' | 'enabled' | 'disabled' | 'error';
 }
 
 export type ConfigureImChannelArgs =
-  | { operation: "inspect"; provider: "feishu"; channel_id?: string }
+  | { operation: 'inspect'; provider: 'feishu' | 'wechat' | 'qq'; channel_id?: string }
   | {
-      operation: "upsert";
-      provider: "feishu";
+      operation: 'upsert';
+      provider: 'feishu';
       channel_alias: string;
       display_name: string;
       app_id: string;
@@ -394,9 +394,9 @@ export type ConfigureImChannelArgs =
       expected_revision: number;
       idempotency_key: string;
     }
-  | { operation: "validate"; channel_id: string; expected_revision: number; idempotency_key: string }
+  | { operation: 'validate'; channel_id: string; expected_revision: number; idempotency_key: string }
   | {
-      operation: "set_enabled";
+      operation: 'set_enabled';
       channel_id: string;
       enabled: boolean;
       expected_revision: number;
@@ -404,8 +404,8 @@ export type ConfigureImChannelArgs =
     };
 
 export type ConfigureImChannelResult =
-  | { operation: "inspect"; provider: string; requirements: string[]; channels: SanitizedImChannel[] }
-  | { operation: "upsert" | "validate" | "set_enabled"; channel: SanitizedImChannel; diagnostics: string[] };
+  | { operation: 'inspect'; provider: string; requirements: string[]; channels: SanitizedImChannel[] }
+  | { operation: 'upsert' | 'validate' | 'set_enabled'; channel: SanitizedImChannel; diagnostics: string[] };
 
 /** Constructed by the Web authentication/CSRF middleware, outside request bodies. */
 export interface VerifiedWebAdmin {
@@ -417,11 +417,7 @@ export interface VerifiedWebAdmin {
 
 /** Web-only control plane. This interface is deliberately separate from MCP tools. */
 export interface WebApprovalService {
-  approve(
-    requestId: string,
-    expectedRevision: number,
-    admin: VerifiedWebAdmin,
-  ): Promise<AccessGrant>;
+  approve(requestId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<AccessGrant>;
   deny(requestId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<void>;
   revoke(grantId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<void>;
 }
@@ -434,7 +430,10 @@ export interface AgentToImTools {
     caller: VerifiedLocalClient,
   ): Promise<ToolResult<ConfigureImChannelResult>>;
   register(args: RegisterArgs, caller: VerifiedCallerContext): Promise<ToolResult<RegisterResult>>;
-  sendMessageToUser(args: SendMessageArgs, caller: VerifiedCallerContext): Promise<ToolResult<SendMessageResult>>;
+  sendMessageToUser(
+    args: SendMessageArgs,
+    caller: VerifiedCallerContext,
+  ): Promise<ToolResult<SendMessageResult>>;
   waitForUserMessage(
     args: WaitForUserArgs,
     caller: VerifiedCallerContext,

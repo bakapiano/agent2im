@@ -1,0 +1,13 @@
+interface:
+  display_name: 'Configure IM Channel'
+  short_description: 'Configure IM channels from the local client'
+  default_prompt: 'Use $configure-im-channel to inspect my IM provider and guide its channel configuration.'
+
+dependencies:
+  tools:
+    - type: 'mcp'
+      value: 'agent-to-im'
+      description: 'Inspect, save, validate, and activate IM channel configuration.'
+
+policy:
+  allow_implicit_invocation: true

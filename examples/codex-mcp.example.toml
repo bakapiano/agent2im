@@ -1,19 +1,13 @@
-# Implemented entry point: run the project build to produce dist/cli.js.
-# Merge this server entry deliberately with the user's existing configuration.
-# Local enrollment supplies the client descriptor; attaching a live session
-# supplies the separately verified runtime descriptor.
+# Source-development MCP entry. The distributed Codex Plugin bundles this setup.
+# First tool use initializes the OS-protected local client and starts the Broker.
 [mcp_servers.agent-to-im]
 command = "D:/agent-to-IM/.tools/node-v24.21.0-win-x64/node.exe"
-args = ["D:/agent-to-IM/dist/cli.js", "mcp", "--descriptor", "D:/agent-to-IM/.local/client-a.dpapi"]
+args = ["D:/agent-to-IM/dist/cli.js", "mcp"]
+env_vars = ["CODEX_HOME"]
 startup_timeout_sec = 15
 tool_timeout_sec = 360
 required = false
 enabled_tools = ["register", "send_message_to_user", "wait_for_user_message", "configure_im_channel"]
 
-# The installation descriptor is shared; per-call native metadata selects the
-# runtime automatically. Native approval remains separate from Web IM grants.
-
-# The descriptor points to ACL-protected local credentials and verified runtime
-# identity. Secret values stay outside model arguments and repository files.
-# The MCP sidecar should initialize even when the Broker is offline; operations
-# then report BROKER_UNAVAILABLE while native Codex remains usable.
+# Per-call host metadata selects the current runtime. IM grants govern its recipient.
+# Default user data is outside the plugin cache in LOCALAPPDATA/agent-to-im.

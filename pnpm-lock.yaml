@@ -69,6 +69,9 @@ importers:
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
+      prettier:
+        specifier: 3.9.9
+        version: 3.9.9
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -1649,6 +1652,11 @@ packages:
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==, tarball: https://registry.npmmirror.com/postcss/-/postcss-8.5.28.tgz}
     engines: {node: ^10 || ^12 || >=14}
+
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==, tarball: https://registry.npmmirror.com/prettier/-/prettier-3.9.9.tgz}
+    engines: {node: '>=14'}
+    hasBin: true
 
   process-warning@4.0.1:
     resolution: {integrity: sha512-3c2LzQ3rY9d0hc1emcsHhfT9Jwz0cChib/QN89oME2R451w5fy3f0afAhERFZAwrbDU43wk12d0ORBpDVME50Q==, tarball: https://registry.npmmirror.com/process-warning/-/process-warning-4.0.1.tgz}
@@ -3393,6 +3401,8 @@ snapshots:
       nanoid: 3.3.19
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  prettier@3.9.9: {}
 
   process-warning@4.0.1: {}
 

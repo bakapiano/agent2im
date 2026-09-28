@@ -51,4 +51,4 @@ App Secret 通过 Portal 写入 Windows DPAPI 凭据后端。MCP 只接收 crede
 
 ## 持久化
 
-数据库使用当前 schema 4。空库初始化，已有库须满足当前格式。IM 身份决定和原生队列映射分别保存。原生历史由 Codex 保管。
+数据库使用当前 schema 5。空库初始化，已有库须满足当前格式。IM 身份决定和原生队列映射分别保存。原生历史由 Codex 保管。

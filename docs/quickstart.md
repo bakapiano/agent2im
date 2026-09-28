@@ -1,6 +1,12 @@
 # 本地运行与队列接入
 
-验收基线：Windows、Node.js 24、Codex CLI 0.154.0。当前数据库 schema 为 4。
+验收基线：Windows、Node.js 24、Codex CLI 0.154.0。当前数据库 schema 为 5。
+
+## 插件入口
+
+发行方式为 [Codex Plugin](plugin.md)：一次安装带入 MCP、两份 Skill 和本地运行包。首次工具调用自动初始化本地客户端、按需启动服务；`$configure-im-channel` 按平台指引配置，`$connect-to-im` 原地注册当前会话。用户数据位于 `%LOCALAPPDATA%/agent-to-im`。
+
+以下为源码开发时的显式服务与 MCP 安装流程。
 
 ## 构建与启动
 
@@ -13,7 +19,7 @@ pwsh -NoProfile -File ./scripts/project.ps1 exec node dist/cli.js serve --data-d
 
 Portal 默认 `http://127.0.0.1:17643`，Agent RPC 为 `http://127.0.0.1:17642`。首次设置使用终端显示的 bootstrap 令牌建立管理员密码。
 
-空库直接初始化，已存在的数据库必须采用 schema 4。程序对格式不一致返回明确错误。
+空库直接初始化，已存在的数据库必须采用 schema 5。程序对格式不一致返回明确错误。
 
 ## 配置飞书与审核使用者
 

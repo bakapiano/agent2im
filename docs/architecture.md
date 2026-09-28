@@ -1,6 +1,8 @@
 # 架构设计
 
-更新：2026-09-28。当前接入采用原生队列中继。
+更新：2026-09-28。当前接入采用原生队列中继，发行入口为 Codex Plugin。
+
+平台代码分为 `src/im/<provider>` 与 `src/code-cli/<provider>`，各自由 port、catalog、registry 定义边界。公共 Broker 根据渠道和原生身份中的 provider 调度；飞书与 Codex 工厂在 CLI 组合入口注册。目录及新增平台流程见[扩展约定](extensions.md)，打包、按需初始化和数据目录见[插件设计](plugin.md)。
 
 ## 产品入口
 
@@ -31,7 +33,7 @@ IM 用户 ⇄ IM Adapter ⇄ Broker ⇄ 队列中继 App Server
 
 - 产品审批对象为 IM 使用者，依据平台 user ID、租户、渠道身份和私聊。
 - 本地客户端凭据证明请求来源；本次 MCP threadId 和原进程身份将调用绑定到真实原生会话。
-- 同一 native home/thread 对应稳定 Session ID，IM 私聊保存当前选择。
+- 同一 provider/native home/thread 对应稳定 Session ID，IM 私聊保存当前选择。
 - cwd 是原生元数据；可选工作区别名用于显示。
 - 渠道配置由 Web 或已认证本地 MCP 直接执行。IM 使用者批准、拒绝、撤销及到期持久化。
 
@@ -64,6 +66,6 @@ status 展示 owner_online/offline、controlMode=queue_relay、executionState=un
 
 ## 存储
 
-schema 4 保存客户端、渠道、IM 审批、session/runtime、Inbox/Outbox、Job、Wait 和审计。每个异步动作携带 session epoch；派发前核验 IM 使用者批准与当前 epoch。按接受顺序处理任务，保留平台未知回执。
+schema 5 保存客户端、渠道、IM 审批、session/runtime、Inbox/Outbox、Job、Wait 和审计。渠道与原生身份含必填 provider。每个异步动作携带 session epoch；派发前核验 IM 使用者批准与当前 epoch。按接受顺序处理任务，保留平台未知回执。
 
-当前数据目录只读写本版结构。发行目录固定构建号；安装只修改本项目 MCP/Skill 文件，使用带校验的备份保护用户配置。
+当前数据目录只读写本版结构。插件缓存保存可搬移程序包，用户数据独立存放。安装只调整本项目插件和重复的 MCP/Skill 入口，使用备份保护用户配置。
