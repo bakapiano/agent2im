@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { createServers } from '../src/server.js';
 import { fixture } from './fixture.js';
+
 let f: Awaited<ReturnType<typeof fixture>>;
 let servers: Awaited<ReturnType<typeof createServers>>;
 afterEach(async () => {
@@ -12,13 +13,20 @@ it('separates admin/local/client audiences, checks CSRF, and persists grants', a
   servers = await createServers(f.broker, 'fixture-install', 'fixture-bootstrap');
   const host = '127.0.0.1:18643';
   const origin = `http://${host}`;
-  expect((await servers.portal.inject({ url: '/api/state', headers: { host } })).statusCode).toBe(401);
+  expect((await servers.portal.inject({ url: '/api/state', headers: { host } })).statusCode).toBe(
+    401,
+  );
   expect(
-    (await servers.portal.inject({ url: '/api/auth', headers: { host: 'evil.invalid' } })).statusCode,
+    (await servers.portal.inject({ url: '/api/auth', headers: { host: 'evil.invalid' } }))
+      .statusCode,
   ).toBe(403);
   expect(
-    (await servers.portal.inject({ url: '/api/auth', headers: { host, origin: 'https://evil.invalid' } }))
-      .statusCode,
+    (
+      await servers.portal.inject({
+        url: '/api/auth',
+        headers: { host, origin: 'https://evil.invalid' },
+      })
+    ).statusCode,
   ).toBe(403);
   const login = await servers.portal.inject({
     method: 'POST',

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+
 test('administrator configures channel and explicitly approves and revokes isolated user', async ({
   page,
 }) => {

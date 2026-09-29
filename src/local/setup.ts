@@ -22,7 +22,12 @@ export function restrictDataDirectory(path: string) {
   if (process.platform === 'win32') {
     const result = spawnSync(
       'icacls.exe',
-      [path, '/inheritance:r', '/grant:r', `${process.env.USERDOMAIN}\\${process.env.USERNAME}:(OI)(CI)F`],
+      [
+        path,
+        '/inheritance:r',
+        '/grant:r',
+        `${process.env.USERDOMAIN}\\${process.env.USERNAME}:(OI)(CI)F`,
+      ],
       { windowsHide: true, stdio: 'pipe' },
     );
     ensure(result.status === 0, 'ACL_FAILED', '数据目录权限设置失败。');
@@ -46,11 +51,15 @@ async function initializationLock<T>(dataDir: string, work: () => Promise<T>): P
       fd = openSync(path, 'wx', 0o600);
       writeFileSync(fd, JSON.stringify({ pid: process.pid }));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
       let owner: { pid: number } | undefined;
       try {
         owner = JSON.parse(readFileSync(path, 'utf8'));
-      } catch {}
+      } catch {
+        // The lock may still be getting written; the bounded loop will retry.
+      }
       if (owner && Number.isInteger(owner.pid) && owner.pid > 0) {
         try {
           process.kill(owner.pid, 0);
@@ -58,13 +67,16 @@ async function initializationLock<T>(dataDir: string, work: () => Promise<T>): P
           if ((e as NodeJS.ErrnoException).code === 'ESRCH') {
             try {
               unlinkSync(path);
-            } catch {}
+            } catch {
+              // The next atomic acquisition rechecks the current lock state.
+            }
             continue;
           }
         }
       }
-      if (Date.now() >= deadline)
+      if (Date.now() >= deadline) {
         throw new AppError('LOCAL_SETUP_BUSY', '本地初始化尚未结束，请重试并查看数据目录日志。');
+      }
       await sleep(100);
     }
   }
@@ -81,8 +93,12 @@ export async function ensureLocalClient(dataDir: string, cliPath: string): Promi
   restrictDataDirectory(dataDir);
   return initializationLock(dataDir, async () => {
     const settingsPath = join(dataDir, 'settings.json');
-    if (!existsSync(settingsPath))
-      atomicWrite(settingsPath, JSON.stringify({ workspaces: {}, portalPort: 17643, agentPort: 17642 }));
+    if (!existsSync(settingsPath)) {
+      atomicWrite(
+        settingsPath,
+        JSON.stringify({ workspaces: {}, portalPort: 17643, agentPort: 17642 }),
+      );
+    }
     await ensureBrokerStarted(dataDir, cliPath);
     const protector = new DpapiProtector();
     const descriptorPath = join(dataDir, 'client-a.dpapi');
@@ -94,16 +110,27 @@ export async function ensureLocalClient(dataDir: string, cliPath: string): Promi
       const brokerUrl = `http://127.0.0.1:${settings.agentPort}`;
       const response = await fetch(`${brokerUrl}/local/enroll`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${installation.secret}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${installation.secret}`,
+        },
         body: JSON.stringify({ name: 'Agent to IM plugin' }),
         signal: AbortSignal.timeout(5000),
       });
       const result = (await response.json()) as any;
-      ensure(response.ok && result.ok, 'LOCAL_ENROLL_FAILED', '本地插件身份初始化失败，请查看 Broker 日志。');
+      ensure(
+        response.ok && result.ok,
+        'LOCAL_ENROLL_FAILED',
+        '本地插件身份初始化失败，请查看 Broker 日志。',
+      );
       atomicWrite(
         descriptorPath,
         await protector.protect(
-          JSON.stringify({ brokerUrl, clientId: result.data.client_id, secret: result.data.secret }),
+          JSON.stringify({
+            brokerUrl,
+            clientId: result.data.client_id,
+            secret: result.data.secret,
+          }),
         ),
       );
     }

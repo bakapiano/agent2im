@@ -247,7 +247,13 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["operation", "channel_id", "enabled", "expected_revision", "idempotency_key"],
+            "required": [
+              "operation",
+              "channel_id",
+              "enabled",
+              "expected_revision",
+              "idempotency_key"
+            ],
             "properties": {
               "operation": {
                 "const": "set_enabled"

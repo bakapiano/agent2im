@@ -5,7 +5,8 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fixture } from '../../fixture.js';
 import { createServers } from '../../../src/server.js';
-import { Rpc, CodexRuntimeFactory, CodexRuntime } from '../../../src/code-cli/codex/runtime.js';
+import type { CodexRuntime } from '../../../src/code-cli/codex/runtime.js';
+import { Rpc, CodexRuntimeFactory } from '../../../src/code-cli/codex/runtime.js';
 import { findCodexExecutable } from '../../../src/code-cli/codex/discovery.js';
 import { DpapiProtector } from '../../../src/credentials/protector.js';
 import { sleep } from '../../../src/core/util.js';
@@ -18,9 +19,10 @@ it.each(['direct-mcp', 'codex-plugin'])(
   'native owner keeps executing via %s while Broker registers, queues and returns IM results',
   async (mode) => {
     mkdirSync('.test-data', { recursive: true });
-    const dir = mkdtempSync(join(tmpdir(), 'agent-to-im-native-relay-')),
-      home = join(dir, 'home');
+    const dir = mkdtempSync(join(tmpdir(), 'agent-to-im-native-relay-'));
+    const home = join(dir, 'home');
     mkdirSync(home);
+
     async function freePort() {
       const s = createServer();
       await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
@@ -28,6 +30,7 @@ it.each(['direct-mcp', 'codex-plugin'])(
       await new Promise<void>((r) => s.close(() => r()));
       return port;
     }
+
     const f = await fixture(
       ':memory:',
       { portalPort: await freePort(), agentPort: await freePort() },
@@ -58,13 +61,15 @@ it.each(['direct-mcp', 'codex-plugin'])(
     );
     const servers = await createServers(f.broker, 'test-install', 'test-bootstrap');
     await servers.listen();
-    let calls = 0,
-      hold = false,
-      next: { name: string; args: any } | undefined;
+    let calls = 0;
+    let hold = false;
+    let next: { name: string; args: any } | undefined;
     const model = createServer(async (req, res) => {
       let raw = '';
       try {
-        for await (const chunk of req) raw += chunk;
+        for await (const chunk of req) {
+          raw += chunk;
+        }
       } catch {
         return;
       }
@@ -75,12 +80,12 @@ it.each(['direct-mcp', 'codex-plugin'])(
         res.writeHead(404).end();
         return;
       }
-      const n = ++calls,
-        ns = input.tools?.find((t: any) => t.name?.includes('agent_to_im')),
-        job = f.store.list('job').find((j) => j.state === 'queued_native');
+      const n = ++calls;
+      const ns = input.tools?.find((t: any) => t.name?.includes('agent_to_im'));
+      const job = f.store.list('job').find((j) => j.state === 'queued_native');
       let chosen = next;
       next = undefined;
-      if (!chosen && job && JSON.stringify(input.input).includes(job.id))
+      if (!chosen && job && JSON.stringify(input.input).includes(job.id)) {
         chosen = {
           name: 'send_message_to_user',
           args: {
@@ -91,6 +96,7 @@ it.each(['direct-mcp', 'codex-plugin'])(
             idempotency_key: 'result-' + job.id,
           },
         };
+      }
       const fn = chosen
         ? (ns?.tools?.find((t: any) => t.name === chosen.name) ??
           input.tools?.find((t: any) => t.name?.endsWith(chosen.name)))
@@ -117,7 +123,9 @@ it.each(['direct-mcp', 'codex-plugin'])(
       res.write(
         `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: `r${n}`, status: 'in_progress', output: [] } })}\n\n`,
       );
-      if (hold) return;
+      if (hold) {
+        return;
+      }
       for (const e of [
         { type: 'response.output_item.added', output_index: 0, item },
         { type: 'response.output_item.done', output_index: 0, item },
@@ -130,8 +138,9 @@ it.each(['direct-mcp', 'codex-plugin'])(
             usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
           },
         },
-      ])
+      ]) {
         res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
+      }
       res.end();
     });
     await new Promise<void>((r) => model.listen(0, '127.0.0.1', r));
@@ -145,9 +154,12 @@ it.each(['direct-mcp', 'codex-plugin'])(
       testMarketplace(root);
       const configPath = join(home, 'config.toml');
       const { readFileSync } = await import('node:fs');
-      writeFileSync(configPath, readFileSync(configPath, 'utf8').split('[mcp_servers.agent-to-im]')[0]);
-      const run = promisify(execFile),
-        env = { ...process.env, CODEX_HOME: home };
+      writeFileSync(
+        configPath,
+        readFileSync(configPath, 'utf8').split('[mcp_servers.agent-to-im]')[0],
+      );
+      const run = promisify(execFile);
+      const env = { ...process.env, CODEX_HOME: home };
       await run(findCodexExecutable(), ['plugin', 'marketplace', 'add', root], {
         env,
         windowsHide: true,
@@ -166,8 +178,8 @@ it.each(['direct-mcp', 'codex-plugin'])(
       );
       vi.stubEnv('AGENT_TO_IM_DATA_DIR', dir);
     }
-    const owner = new Rpc(findCodexExecutable(), home),
-      events: any[] = [];
+    const owner = new Rpc(findCodexExecutable(), home);
+    const events: any[] = [];
     owner.events.on('notification', (e) => events.push(e));
     try {
       await owner.connect();
@@ -179,6 +191,7 @@ it.each(['direct-mcp', 'codex-plugin'])(
         sandbox: 'read-only',
         approvalPolicy: 'never',
       });
+
       async function turn(text: string, tool?: { name: string; args: any }) {
         next = tool;
         const started = await owner.call('turn/start', {
@@ -189,13 +202,15 @@ it.each(['direct-mcp', 'codex-plugin'])(
         while (
           Date.now() < deadline &&
           !events.some((e) => e.method === 'turn/completed' && e.params.turn.id === started.turn.id)
-        )
+        ) {
           await sleep(50);
+        }
         expect(
           events.some((e) => e.method === 'turn/completed' && e.params.turn.id === started.turn.id),
         ).toBe(true);
         return started.turn.id;
       }
+
       // The synthetic model responds immediately; wait for the optional plugin MCP handshake
       // before asking it to select tools, just as the real CLI startup indicator does.
       const readyBy = Date.now() + 15_000;
@@ -207,8 +222,9 @@ it.each(['direct-mcp', 'codex-plugin'])(
             e.params.status === 'ready',
         ) &&
         Date.now() < readyBy
-      )
+      ) {
         await sleep(50);
+      }
       expect(
         events.some(
           (e) =>
@@ -255,7 +271,9 @@ it.each(['direct-mcp', 'codex-plugin'])(
         },
       });
       const deadline = Date.now() + 18000;
-      while (!f.store.list('wait').length && Date.now() < deadline) await sleep(50);
+      while (!f.store.list('wait').length && Date.now() < deadline) {
+        await sleep(50);
+      }
       await f.broker.tick();
       const question = f.store.list('wait')[0];
       expect(question).toBeTruthy();
@@ -266,10 +284,14 @@ it.each(['direct-mcp', 'codex-plugin'])(
       await f.broker.tick();
       const job = f.store.list('job')[0];
       const finish = Date.now() + 25000;
-      while (f.store.get('job', job.id)?.state !== 'completed' && Date.now() < finish) await sleep(50);
+      while (f.store.get('job', job.id)?.state !== 'completed' && Date.now() < finish) {
+        await sleep(50);
+      }
       await f.broker.tick();
       expect(f.store.get('job', job.id)?.state).toBe('completed');
-      expect(f.im.sent.some((o) => o.purpose === 'result' && o.text.includes('original owner'))).toBe(true);
+      expect(
+        f.im.sent.some((o) => o.purpose === 'result' && o.text.includes('original owner')),
+      ).toBe(true);
       expect(owner.processId).toBe(ownerPid);
       expect((await owner.call('thread/loaded/list', {})).data).toContain(thread.id);
       const status = await f.broker.status(session);
@@ -283,7 +305,11 @@ it.each(['direct-mcp', 'codex-plugin'])(
         threadId: thread.id,
         input: [{ type: 'text', text: 'hold for scoped stop' }],
       });
-      await owner.call('thread/goal/set', { threadId: thread.id, objective: 'stop test', status: 'active' });
+      await owner.call('thread/goal/set', {
+        threadId: thread.id,
+        objective: 'stop test',
+        status: 'active',
+      });
       await owner.call('thread/queue/add', {
         threadId: thread.id,
         clientUserMessageId: randomUUID(),
@@ -299,7 +325,8 @@ it.each(['direct-mcp', 'codex-plugin'])(
       hold = false;
       await turn('Original terminal continues after integration');
       expect(
-        (await owner.call('thread/read', { threadId: thread.id, includeTurns: true })).thread.turns.length,
+        (await owner.call('thread/read', { threadId: thread.id, includeTurns: true })).thread.turns
+          .length,
       ).toBeGreaterThan(3);
     } finally {
       await owner.close();

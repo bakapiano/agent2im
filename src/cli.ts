@@ -44,13 +44,16 @@ const dataDir = resolve(
 );
 const protector = new DpapiProtector();
 const settingsFile = join(dataDir, 'settings.json');
+
 async function protectedWrite(path: string, value: unknown) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, await protector.protect(JSON.stringify(value)), { mode: 0o600 });
 }
+
 async function protectedRead<T>(path: string): Promise<T> {
   return JSON.parse(await protector.unprotect(readFileSync(path, 'utf8')));
 }
+
 async function main() {
   if (command === 'version') {
     console.log(JSON.stringify({ version: appVersion, buildId }));
@@ -87,8 +90,13 @@ async function main() {
     const cliPath = resolve(fileURLToPath(import.meta.url));
     if (values.descriptor) {
       const path = resolve(values.descriptor);
-      await runMcp(() => protectedRead<Descriptor>(path), discoverNative, { descriptorPath: path, cliPath });
-    } else await runMcp(() => ensureLocalClient(dataDir, cliPath), discoverNative);
+      await runMcp(() => protectedRead<Descriptor>(path), discoverNative, {
+        descriptorPath: path,
+        cliPath,
+      });
+    } else {
+      await runMcp(() => ensureLocalClient(dataDir, cliPath), discoverNative);
+    }
     return;
   }
   if (command === 'serve') {
@@ -107,18 +115,26 @@ async function main() {
       portalPort: Number(values['portal-port'] ?? saved.portalPort ?? 17643),
       agentPort: Number(values['agent-port'] ?? saved.agentPort ?? 17642),
     };
-    for (const p of [settings.portalPort, settings.agentPort])
-      ensure(Number.isInteger(p) && p >= 1024 && p <= 65535, 'PORT_INVALID', '端口范围为 1024–65535。');
+    for (const p of [settings.portalPort, settings.agentPort]) {
+      ensure(
+        Number.isInteger(p) && p >= 1024 && p <= 65535,
+        'PORT_INVALID',
+        '端口范围为 1024–65535。',
+      );
+    }
     ensure(settings.portalPort !== settings.agentPort, 'PORT_INVALID', '两个受众使用独立端口。');
     writeFileSync(settingsFile, JSON.stringify(settings, null, 2), { mode: 0o600 });
     const installFile = join(dataDir, 'installation.dpapi');
-    if (!existsSync(installFile)) await protectedWrite(installFile, { secret: token() });
+    if (!existsSync(installFile)) {
+      await protectedWrite(installFile, { secret: token() });
+    }
     const installation = await protectedRead<{ secret: string }>(installFile);
     const bootstrap = token();
     const store = new Store(join(dataDir, 'broker.sqlite'));
     const vault = new Vault(store, protector);
-    if (!store.setting('adminPassword'))
+    if (!store.setting('adminPassword')) {
       await protectedWrite(join(dataDir, 'portal-bootstrap.dpapi'), { token: bootstrap });
+    }
     const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
     const broker = new Broker(
       store,
@@ -133,10 +149,14 @@ async function main() {
     console.log(
       `Portal: http://127.0.0.1:${settings.portalPort}\nAgent RPC: http://127.0.0.1:${settings.agentPort}`,
     );
-    if (!store.setting('adminPassword')) console.log(`首次设置令牌（仅本次进程有效）：${bootstrap}`);
+    if (!store.setting('adminPassword')) {
+      console.log(`首次设置令牌（仅本次进程有效）：${bootstrap}`);
+    }
     let closing = false;
     const close = async () => {
-      if (closing) return;
+      if (closing) {
+        return;
+      }
       closing = true;
       await broker.close();
       await servers.close();
@@ -146,8 +166,14 @@ async function main() {
     process.once('SIGTERM', () => void close());
     return;
   }
-  if (command === 'portal') await ensureLocalClient(dataDir, resolve(fileURLToPath(import.meta.url)));
-  ensure(existsSync(settingsFile), 'SETUP_REQUIRED', '请先调用插件工具或运行 serve 初始化本地服务。');
+  if (command === 'portal') {
+    await ensureLocalClient(dataDir, resolve(fileURLToPath(import.meta.url)));
+  }
+  ensure(
+    existsSync(settingsFile),
+    'SETUP_REQUIRED',
+    '请先调用插件工具或运行 serve 初始化本地服务。',
+  );
   const settings = JSON.parse(readFileSync(settingsFile, 'utf8'));
   const brokerUrl = `http://127.0.0.1:${settings.agentPort}`;
   if (command === 'portal') {
@@ -157,7 +183,9 @@ async function main() {
     const auth = (await response.json()) as any;
     let url = `http://127.0.0.1:${settings.portalPort}/`;
     if (!auth.data?.configured) {
-      const bootstrap = await protectedRead<{ token: string }>(join(dataDir, 'portal-bootstrap.dpapi'));
+      const bootstrap = await protectedRead<{ token: string }>(
+        join(dataDir, 'portal-bootstrap.dpapi'),
+      );
       url += `#setup=${encodeURIComponent(bootstrap.token)}`;
     }
     const opened = spawnSync('explorer.exe', [url], { windowsHide: true, stdio: 'pipe' });
@@ -182,7 +210,10 @@ async function main() {
   const post = async (path: string, data: unknown) => {
     const r = await fetch(`${brokerUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${installation.secret}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${installation.secret}`,
+      },
       body: JSON.stringify(data),
     });
     const b = (await r.json()) as any;
@@ -194,12 +225,17 @@ async function main() {
   if (command === 'enroll') {
     ensure(!existsSync(descriptorPath), 'DESCRIPTOR_EXISTS', '描述文件已存在，请选择新文件名。');
     const result = await post('/local/enroll', { name: values.name ?? 'Codex CLI' });
-    await protectedWrite(descriptorPath, { brokerUrl, clientId: result.client_id, secret: result.secret });
+    await protectedWrite(descriptorPath, {
+      brokerUrl,
+      clientId: result.client_id,
+      secret: result.secret,
+    });
     console.log(`客户端已登记；保护文件：${descriptorPath}`);
     return;
   }
   throw new Error('未知命令，请运行 help。');
 }
+
 main().catch((error) => {
   console.error(JSON.stringify(errorBody(error)));
   process.exitCode = 1;

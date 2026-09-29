@@ -5,17 +5,22 @@ import { fixture } from './fixture.js';
 import { validateTool } from '../src/core/validation.js';
 import { DpapiProtector } from '../src/credentials/protector.js';
 import { sleep } from '../src/core/util.js';
+
 let f: Awaited<ReturnType<typeof fixture>> | undefined;
 afterEach(async () => {
   await f?.close();
   f = undefined;
 });
 describe('public schemas', () => {
-  for (const c of cases.cases)
+  for (const c of cases.cases) {
     it(c.name, () => {
-      if (c.valid) expect(() => validateTool(c.tool, c.arguments)).not.toThrow();
-      else expect(() => validateTool(c.tool, c.arguments)).toThrow();
+      if (c.valid) {
+        expect(() => validateTool(c.tool, c.arguments)).not.toThrow();
+      } else {
+        expect(() => validateTool(c.tool, c.arguments)).toThrow();
+      }
     });
+  }
 });
 it('first contact creates only approval metadata and persists one neutral notice', async () => {
   f = await fixture();
@@ -69,7 +74,13 @@ it('explicit replies stay with original session after switch and consume the ans
   const b = await f.connect('B', false);
   const waiting = f.broker.tool(
     'wait_for_user_message',
-    { session_id: a.session.id, mode: 'ask', request_key: 'q1', prompt: '继续吗？', timeout_seconds: 2 },
+    {
+      session_id: a.session.id,
+      mode: 'ask',
+      request_key: 'q1',
+      prompt: '继续吗？',
+      timeout_seconds: 2,
+    },
     a.caller,
   );
   await sleep(30);
@@ -84,7 +95,9 @@ it('explicit replies stay with original session after switch and consume the ans
     reply: { text: '继续' },
   });
   expect(f.store.list('job')).toHaveLength(0);
-  expect(f.store.list('inbox').filter((i) => i.platformMessageId === 'answer-once')).toHaveLength(1);
+  expect(f.store.list('inbox').filter((i) => i.platformMessageId === 'answer-once')).toHaveLength(
+    1,
+  );
 });
 it('status and switch stay responsive during wait; resumed requests preserve deadlines', async () => {
   f = await fixture();
@@ -96,7 +109,9 @@ it('status and switch stay responsive during wait; resumed requests preserve dea
     prompt: 'question',
     timeout_seconds: 1,
   } as const;
-  expect(await f.broker.tool('wait_for_user_message', args, a.caller)).toMatchObject({ status: 'waiting' });
+  expect(await f.broker.tool('wait_for_user_message', args, a.caller)).toMatchObject({
+    status: 'waiting',
+  });
   const original = f.store.list('wait')[0];
   await f.inbound('/status');
   expect(f.store.list('outbox').some((o) => o.text.includes('waiting_questions'))).toBe(true);
@@ -122,7 +137,13 @@ it('stop fences old turn, cancels waiting/jobs/outbox, and allows explicit new I
   a.runtime.active = true;
   const waiting = f.broker.tool(
     'wait_for_user_message',
-    { session_id: a.session.id, mode: 'ask', request_key: 'q1', prompt: 'question', timeout_seconds: 2 },
+    {
+      session_id: a.session.id,
+      mode: 'ask',
+      request_key: 'q1',
+      prompt: 'question',
+      timeout_seconds: 2,
+    },
     a.caller,
   );
   await sleep(20);
@@ -216,7 +237,9 @@ it('IM result is explicitly returned by the originating session', async () => {
   expect(f.im.sent.filter((o) => o.purpose === 'result')).toHaveLength(1);
 });
 it('Windows DPAPI roundtrip encrypts secret', async () => {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {
+    return;
+  }
   const p = new DpapiProtector();
   const secret = `test-only-${randomUUID()}`;
   const encrypted = await p.protect(secret);

@@ -2,20 +2,26 @@ import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 const hash = createHash('sha256');
+
 function hashTree(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
     a.name.localeCompare(b.name),
   )) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) hashTree(path);
-    else {
+    if (entry.isDirectory()) {
+      hashTree(path);
+    } else {
       hash.update(path.replaceAll('\\', '/'));
       hash.update(readFileSync(path));
     }
   }
 }
-for (const dir of ['src', 'spec', 'plugins']) hashTree(dir);
+
+for (const dir of ['src', 'spec', 'plugins']) {
+  hashTree(dir);
+}
 hash.update(readFileSync('scripts/build.mjs'));
 hash.update(readFileSync('scripts/package-plugin.mjs'));
 hash.update(readFileSync('pnpm-lock.yaml'));

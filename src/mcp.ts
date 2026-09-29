@@ -3,11 +3,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import { toolDefinitions, validateTool } from './core/validation.js';
-import { AppError, errorBody } from './core/errors.js';
+import { errorBody } from './core/errors.js';
 import type { NativeContext } from './code-cli/port.js';
 import { appVersion, buildId } from './core/build.js';
 import { ensureBrokerStarted } from './broker-start.js';
 import { dirname } from 'node:path';
+
 export interface Descriptor {
   brokerUrl: string;
   clientId: string;
@@ -36,14 +37,19 @@ export async function runMcp(
       validateTool(request.params.name, request.params.arguments);
       const d = await readDescriptor();
       const url = new URL(d.brokerUrl);
-      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1')
+      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') {
         throw new Error('Invalid broker endpoint');
+      }
       if (installation) {
         let ready = false;
         try {
           ready = (await fetch(`${d.brokerUrl}/health`, { signal: AbortSignal.timeout(500) })).ok;
-        } catch {}
-        if (!ready) await ensureBrokerStarted(dirname(installation.descriptorPath), installation.cliPath);
+        } catch {
+          // An offline Broker is started by ensureBrokerStarted below.
+        }
+        if (!ready) {
+          await ensureBrokerStarted(dirname(installation.descriptorPath), installation.cliPath);
+        }
       }
       const nativeContext =
         request.params.name === 'configure_im_channel'
@@ -51,7 +57,10 @@ export async function runMcp(
           : await discoverContext(request.params._meta);
       const response = await fetch(`${d.brokerUrl}/rpc/tool`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${d.clientId}:${d.secret}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${d.clientId}:${d.secret}`,
+        },
         body: JSON.stringify({
           name: request.params.name,
           args: request.params.arguments,

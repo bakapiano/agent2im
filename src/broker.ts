@@ -38,20 +38,30 @@ export interface Caller {
   attemptId: string;
   nativeContext?: NativeContext;
 }
-const isFencedState = (state: Session['state']) => ['stopping', 'stopped', 'stop_incomplete'].includes(state);
+const isFencedState = (state: Session['state']) =>
+  ['stopping', 'stopped', 'stop_incomplete'].includes(state);
 const help =
   '/sessions · /switch <会话短ID> · /status [短ID] · /send <短ID> <任务> · /reply <问题短ID> <回答> · /stop [短ID]\n普通文本发送给当前会话；引用问题可回复原会话。';
 
 export class Broker {
   readonly policy: Policy;
+
   readonly channels: ChannelService;
+
   readonly runtimes = new Map<string, LiveRuntime>();
+
   private connecting = new Map<string, Promise<LiveRuntime>>();
+
   private locks = new KeyedLock();
+
   private timer?: NodeJS.Timeout;
+
   private pumping?: Promise<void>;
+
   private closed = false;
+
   private stopping = new Map<string, Promise<unknown>>();
+
   constructor(
     readonly store: Store,
     readonly vault: Vault,
@@ -65,13 +75,16 @@ export class Broker {
     this.policy.onChange = () => this.recheck();
     this.channels.onChange = () => this.recheck();
   }
+
   async start() {
     // A crash after a side effect yields an uncertain result, never blind replay.
     for (const o of this.store.list('outbox').filter((o) => o.state === 'sending')) {
       o.state = 'unknown';
       this.store.put('outbox', o);
     }
-    for (const j of this.store.list('job').filter((j) => ['dispatching', 'running'].includes(j.state))) {
+    for (const j of this.store
+      .list('job')
+      .filter((j) => ['dispatching', 'running'].includes(j.state))) {
       j.state = 'unknown';
       this.store.put('job', j);
     }
@@ -83,12 +96,18 @@ export class Broker {
         const report = {
           complete: false,
           scope: 'tracked_resources',
-          residuals: [{ resourceId: s.threadId, reason: '服务重启前的停止操作未完成核对，请重试 /stop' }],
+          residuals: [
+            { resourceId: s.threadId, reason: '服务重启前的停止操作未完成核对，请重试 /stop' },
+          ],
         };
-        const pending = this.store.list('stop').filter((r) => r.sessionId === s.id && r.state === 'running');
-        if (pending.length)
-          for (const record of pending) this.store.put('stop', { ...record, state: 'incomplete', report });
-        else
+        const pending = this.store
+          .list('stop')
+          .filter((r) => r.sessionId === s.id && r.state === 'running');
+        if (pending.length) {
+          for (const record of pending) {
+            this.store.put('stop', { ...record, state: 'incomplete', report });
+          }
+        } else {
           this.store.put('stop', {
             id: id('stop'),
             sessionId: s.id,
@@ -96,7 +115,10 @@ export class Broker {
             report,
             createdAt: now(),
           });
-      } else if (!isFencedState(s.state)) s.state = 'offline';
+        }
+      } else if (!isFencedState(s.state)) {
+        s.state = 'offline';
+      }
       this.store.put('session', s);
     }
     this.recheck();
@@ -106,8 +128,11 @@ export class Broker {
     }, 300);
     this.timer.unref();
     // Subscribe before an agent makes its registration call.
-    await Promise.all(this.store.list('runtime').map((r) => this.runtime(r.id).catch(() => undefined)));
+    await Promise.all(
+      this.store.list('runtime').map((r) => this.runtime(r.id).catch(() => undefined)),
+    );
   }
+
   authenticate(caller: Caller): Client {
     const c = this.store.get('client', caller.clientId);
     ensure(
@@ -118,6 +143,7 @@ export class Broker {
     );
     return c;
   }
+
   enroll(name: string, osUser: string) {
     const secret = token();
     const client: Client = {
@@ -134,11 +160,16 @@ export class Broker {
     this.store.audit('client.enrolled', 'local-installation', client.id);
     return { client_id: client.id, secret };
   }
+
   async runtime(runtimeId: string): Promise<LiveRuntime> {
     const live = this.runtimes.get(runtimeId);
-    if (live) return live;
+    if (live) {
+      return live;
+    }
     const existing = this.connecting.get(runtimeId);
-    if (existing) return existing;
+    if (existing) {
+      return existing;
+    }
     const work = (async () => {
       const link = this.store.get('runtime', runtimeId);
       ensure(link, 'RUNTIME_UNREACHABLE', '运行绑定不存在。', 503);
@@ -157,7 +188,9 @@ export class Broker {
       }
       this.runtimes.set(runtimeId, r);
       r.onEvent((e) => {
-        if (this.runtimes.get(link.id) === r) this.event(link, e);
+        if (this.runtimes.get(link.id) === r) {
+          this.event(link, e);
+        }
       });
       return r;
     })();
@@ -168,17 +201,22 @@ export class Broker {
       this.connecting.delete(runtimeId);
     }
   }
+
   async tool(name: string, args: any, caller: Caller, signal?: AbortSignal): Promise<unknown> {
     validateTool(name, args);
     const client = this.authenticate(caller);
-    if (name === 'configure_im_channel') return this.channels.execute(args as ConfigureImChannelArgs, client);
+    if (name === 'configure_im_channel') {
+      return this.channels.execute(args as ConfigureImChannelArgs, client);
+    }
     const context = caller.nativeContext;
     ensure(context, 'THREAD_CONTEXT_UNVERIFIED', '需要当前原生会话元数据。', 403);
     const entered = this.store
       .list('session')
       .find(
         (s) =>
-          s.provider === context.provider && s.homeId === context.homeId && s.threadId === context.threadId,
+          s.provider === context.provider &&
+          s.homeId === context.homeId &&
+          s.threadId === context.threadId,
       );
     const link = await this.bindNative(context, client);
     const snapshot = await (await this.runtime(link.id)).inspect();
@@ -188,15 +226,18 @@ export class Broker {
       '当前会话归属核对失败。',
       403,
     );
-    if (entered)
+    if (entered) {
       ensure(
         this.store.get('session', entered.id)?.epoch === entered.epoch,
         'STALE_CONTROL_EPOCH',
         '该调用发起后会话已被停止。',
         409,
       );
+    }
     this.authenticate(caller);
-    if (name === 'register') return this.register(args, client, link);
+    if (name === 'register') {
+      return this.register(args, client, link);
+    }
     const s = this.store.get('session', args.session_id);
     ensure(
       s && s.clientId === client.id && s.runtimeId === link.id && s.threadId === context.threadId,
@@ -210,64 +251,77 @@ export class Broker {
       '会话已停止或仍需核对停止结果。',
       409,
     );
-    if (name === 'send_message_to_user') return this.send(s, args);
+    if (name === 'send_message_to_user') {
+      return this.send(s, args);
+    }
     return this.wait(s, args, signal);
   }
+
   private async bindNative(context: NativeContext, client: Client): Promise<RuntimeLink> {
     this.agents.validateContext(context);
-    return this.locks.run(`native:${context.provider}:${context.homeId}:${context.threadId}`, async () => {
-      const existing = this.store
-        .list('runtime')
-        .find(
-          (r) =>
-            r.provider === context.provider && r.homeId === context.homeId && r.threadId === context.threadId,
-        );
-      ensure(
-        !existing || existing.clientId === client.id,
-        'THREAD_OWNERSHIP_CONFLICT',
-        '该会话属于另一客户端。',
-        409,
-      );
-      if (existing && digest(existing.owner) === digest(context.owner)) return existing;
-      const link: RuntimeLink = {
-        id: existing?.id ?? id('runtime'),
-        provider: context.provider,
-        clientId: client.id,
-        threadId: context.threadId,
-        homeId: context.homeId,
-        owner: context.owner,
-        cwd: '',
-        workspace: '',
-        createdAt: now(),
-      };
-      const live = this.agents.create(link);
-      try {
-        const snapshot = await live.connect();
+    return this.locks.run(
+      `native:${context.provider}:${context.homeId}:${context.threadId}`,
+      async () => {
+        const existing = this.store
+          .list('runtime')
+          .find(
+            (r) =>
+              r.provider === context.provider &&
+              r.homeId === context.homeId &&
+              r.threadId === context.threadId,
+          );
         ensure(
-          snapshot.threadId === context.threadId && snapshot.status !== 'offline',
-          'THREAD_CONTEXT_UNVERIFIED',
-          '当前原生宿主或会话无法核验。',
-          403,
+          !existing || existing.clientId === client.id,
+          'THREAD_OWNERSHIP_CONFLICT',
+          '该会话属于另一客户端。',
+          409,
         );
-        link.cwd = nativePath(snapshot.cwd);
-        link.workspace = workspaceLabel(link.cwd, this.config.workspaces);
-      } catch (error) {
-        await live.close();
-        throw error;
-      }
-      await this.runtimes.get(link.id)?.close();
-      this.store.put('runtime', link);
-      this.runtimes.set(link.id, live);
-      live.onEvent((e) => {
-        if (this.runtimes.get(link.id) === live) this.event(link, e);
-      });
-      this.store.audit('runtime.queue_relay_bound', client.id, link.id, {
-        threadId: link.threadId,
-        ownerPid: link.owner.pid,
-      });
-      return link;
-    });
+        if (existing && digest(existing.owner) === digest(context.owner)) {
+          return existing;
+        }
+        const link: RuntimeLink = {
+          id: existing?.id ?? id('runtime'),
+          provider: context.provider,
+          clientId: client.id,
+          threadId: context.threadId,
+          homeId: context.homeId,
+          owner: context.owner,
+          cwd: '',
+          workspace: '',
+          createdAt: now(),
+        };
+        const live = this.agents.create(link);
+        try {
+          const snapshot = await live.connect();
+          ensure(
+            snapshot.threadId === context.threadId && snapshot.status !== 'offline',
+            'THREAD_CONTEXT_UNVERIFIED',
+            '当前原生宿主或会话无法核验。',
+            403,
+          );
+          link.cwd = nativePath(snapshot.cwd);
+          link.workspace = workspaceLabel(link.cwd, this.config.workspaces);
+        } catch (error) {
+          await live.close();
+          throw error;
+        }
+        await this.runtimes.get(link.id)?.close();
+        this.store.put('runtime', link);
+        this.runtimes.set(link.id, live);
+        live.onEvent((e) => {
+          if (this.runtimes.get(link.id) === live) {
+            this.event(link, e);
+          }
+        });
+        this.store.audit('runtime.queue_relay_bound', client.id, link.id, {
+          threadId: link.threadId,
+          ownerPid: link.owner.pid,
+        });
+        return link;
+      },
+    );
   }
+
   private register(args: RegisterArgs, client: Client, link: RuntimeLink) {
     ensure(
       !args.native_thread_id || args.native_thread_id === link.threadId,
@@ -287,13 +341,27 @@ export class Broker {
           this.policy.find(imSubject(ch, c.tenantId, c.userId), ch, c.id)
         );
       });
-      if (eligible.length > 1)
-        throw new AppError('CONNECTION_SELECTION_REQUIRED', '存在多个获批私聊，请选择这次接入的会话。', 409, {
-          connections: eligible.map((c) => ({ connection_alias: c.alias, display_name: c.displayName })),
-        });
+      if (eligible.length > 1) {
+        throw new AppError(
+          'CONNECTION_SELECTION_REQUIRED',
+          '存在多个获批私聊，请选择这次接入的会话。',
+          409,
+          {
+            connections: eligible.map((c) => ({
+              connection_alias: c.alias,
+              display_name: c.displayName,
+            })),
+          },
+        );
+      }
       c = eligible[0];
     }
-    ensure(c, 'CONNECTION_NOT_APPROVED', '请先在 IM 私聊机器人，并在 Web 批准后使用私聊连接别名。', 403);
+    ensure(
+      c,
+      'CONNECTION_NOT_APPROVED',
+      '请先在 IM 私聊机器人，并在 Web 批准后使用私聊连接别名。',
+      403,
+    );
     const channel = this.store.get('channel', c.channelId)!;
     ensure(
       channel?.state === 'enabled' && channel.identityVersion === c.identityVersion,
@@ -303,7 +371,10 @@ export class Broker {
     );
     const old = this.store
       .list('session')
-      .find((s) => s.provider === link.provider && s.homeId === link.homeId && s.threadId === link.threadId);
+      .find(
+        (s) =>
+          s.provider === link.provider && s.homeId === link.homeId && s.threadId === link.threadId,
+      );
     ensure(
       !old || (old.clientId === client.id && old.conversationId === c.id),
       'THREAD_OWNERSHIP_CONFLICT',
@@ -312,7 +383,11 @@ export class Broker {
     );
     const sid =
       old?.id ??
-      this.store.claim('native-session', `${link.provider}:${link.homeId}:${link.threadId}`, randomUUID());
+      this.store.claim(
+        'native-session',
+        `${link.provider}:${link.homeId}:${link.threadId}`,
+        randomUUID(),
+      );
     this.policy.require(imSubject(channel, c.tenantId, c.userId), channel, c.id);
     const memoId = `register:${client.id}:${link.id}:${args.idempotency_key}`;
     const memo = this.store.get('idempotency', memoId);
@@ -334,12 +409,15 @@ export class Broker {
       channelId: channel.id,
       conversationId: c.id,
       epoch: old?.epoch ?? 1,
-      state: old && ['stopping', 'stopped', 'stop_incomplete'].includes(old.state) ? old.state : 'ready',
+      state:
+        old && ['stopping', 'stopped', 'stop_incomplete'].includes(old.state) ? old.state : 'ready',
       createdAt: old?.createdAt ?? now(),
       lastSeenAt: now(),
     };
     this.store.put('session', session);
-    if (args.activate) this.store.setSetting(`selection:${c.id}`, sid);
+    if (args.activate) {
+      this.store.setSetting(`selection:${c.id}`, sid);
+    }
     const result = {
       session_id: sid,
       short_id: session.shortId,
@@ -356,15 +434,21 @@ export class Broker {
     this.store.audit('session.registered', client.id, sid);
     return result;
   }
+
   private stamp(s: Session): AuthStamp {
     const c = this.store.get('conversation', s.conversationId)!;
     return {
       channelId: s.channelId,
       identityVersion: c.identityVersion,
       conversationId: c.id,
-      subject: imSubject({ id: s.channelId, identityVersion: c.identityVersion }, c.tenantId, c.userId),
+      subject: imSubject(
+        { id: s.channelId, identityVersion: c.identityVersion },
+        c.tenantId,
+        c.userId,
+      ),
     };
   }
+
   private enqueue(
     c: Conversation,
     text: string,
@@ -379,7 +463,12 @@ export class Broker {
       const previous = this.store.get('outbox', oid);
       const payloadDigest = digest({ text, purpose });
       if (previous) {
-        ensure(previous.payloadDigest === payloadDigest, 'IDEMPOTENCY_CONFLICT', '消息幂等键内容变化。', 409);
+        ensure(
+          previous.payloadDigest === payloadDigest,
+          'IDEMPOTENCY_CONFLICT',
+          '消息幂等键内容变化。',
+          409,
+        );
         return previous;
       }
       const o: Outbox = {
@@ -403,18 +492,23 @@ export class Broker {
       return o;
     });
   }
+
   private send(s: Session, args: SendMessageArgs) {
     const stamp = this.stamp(s);
     this.policy.check(stamp);
     const memoId = `send-memo:${s.id}:${args.idempotency_key}`;
     const memo = this.store.get('idempotency', memoId);
-    const payload = digest({ text: args.text, purpose: args.purpose ?? 'notice', jobId: args.job_id });
+    const payload = digest({
+      text: args.text,
+      purpose: args.purpose ?? 'notice',
+      jobId: args.job_id,
+    });
     if (memo) {
       ensure(memo.digest === payload, 'IDEMPOTENCY_CONFLICT', '消息幂等键内容变化。', 409);
       return this.sendResult(s, this.store.get('outbox', memo.result as string)!);
     }
     const job = args.job_id ? this.store.get('job', args.job_id) : undefined;
-    if (args.job_id)
+    if (args.job_id) {
       ensure(
         job &&
           job.sessionId === s.id &&
@@ -425,6 +519,7 @@ export class Broker {
         '结果必须属于当前会话的当前任务。',
         403,
       );
+    }
     const key = job ? `result:${job.id}` : `send:${s.id}:${args.idempotency_key}`;
     const o = this.enqueue(
       this.store.get('conversation', s.conversationId)!,
@@ -443,6 +538,7 @@ export class Broker {
     this.store.put('idempotency', { id: memoId, digest: payload, result: o.id });
     return this.sendResult(s, o);
   }
+
   private sendResult(s: Session, o: Outbox) {
     ensure(
       !['failed', 'cancelled'].includes(o.state),
@@ -458,6 +554,7 @@ export class Broker {
       platform_message_id: o.platformMessageId,
     };
   }
+
   private async wait(s: Session, args: WaitForUserArgs, signal?: AbortSignal) {
     const auth = this.stamp(s);
     this.policy.check(auth);
@@ -500,18 +597,21 @@ export class Broker {
       this.store.put('wait', w);
       s.state = 'waiting_user';
       this.store.put('session', s);
-    } else if (args.mode === 'ask')
+    } else if (args.mode === 'ask') {
       ensure(
         w.payloadDigest === digest({ prompt: args.prompt, ttl: args.reply_ttl_seconds ?? 1800 }),
         'IDEMPOTENCY_CONFLICT',
         '问题内容或期限变化。',
         409,
       );
+    }
     const deadline = now() + (args.timeout_seconds ?? 240) * 1000;
     do {
       this.recheck();
       w = this.store.get('wait', wid)!;
-      if (w.state !== 'open' || signal?.aborted || this.closed) break;
+      if (w.state !== 'open' || signal?.aborted || this.closed) {
+        break;
+      }
       await sleep(Math.min(100, Math.max(1, deadline - now())));
     } while (now() < deadline);
     return {
@@ -524,6 +624,7 @@ export class Broker {
       ...(w.reason ? { reason: w.reason } : {}),
     };
   }
+
   async receive(channel: Channel, event: ImEvent) {
     if (
       event.chatType !== 'p2p' ||
@@ -531,11 +632,14 @@ export class Broker {
       !event.tenantId ||
       !event.messageId ||
       event.text.length > 12000
-    )
+    ) {
       return;
+    }
     await this.locks.run(`inbound:${channel.id}:${event.tenantId}:${event.userId}`, async () => {
       const current = this.store.get('channel', channel.id);
-      if (current?.state !== 'enabled' || current.identityVersion !== channel.identityVersion) return;
+      if (current?.state !== 'enabled' || current.identityVersion !== channel.identityVersion) {
+        return;
+      }
       const cid = this.store.claim(
         'conversation',
         `${channel.id}:${channel.identityVersion}:${event.tenantId}:${event.userId}`,
@@ -574,7 +678,9 @@ export class Broker {
         return;
       }
       const iid = this.store.claim('inbox', `${channel.id}:${event.messageId}`, id('in'));
-      if (this.store.get('inbox', iid)) return;
+      if (this.store.get('inbox', iid)) {
+        return;
+      }
       const inbox = {
         id: iid,
         channelId: channel.id,
@@ -598,7 +704,9 @@ export class Broker {
         const sessions = this.store.list('session').filter((s) => s.conversationId === cid);
         const selected = (arg?: string) => {
           const s = sessions.find((s) =>
-            arg ? s.shortId === arg || s.id === arg : s.id === this.store.setting(`selection:${cid}`),
+            arg
+              ? s.shortId === arg || s.id === arg
+              : s.id === this.store.setting(`selection:${cid}`),
           );
           ensure(s, 'SESSION_NOT_REGISTERED', '请先注册会话，再使用 /sessions 和 /switch。', 404);
           return s;
@@ -643,7 +751,9 @@ export class Broker {
         if (command?.name === 'reply') {
           const split = command.args.match(/^(\S+)\s+([\s\S]+)$/);
           ensure(split, 'INVALID_ARGUMENTS', '用法：/reply <问题短ID> <回答>');
-          question = this.store.list('wait').find((w) => w.conversationId === cid && w.shortId === split[1]);
+          question = this.store
+            .list('wait')
+            .find((w) => w.conversationId === cid && w.shortId === split[1]);
           text = split[2];
           explicitQuestion = true;
         } else if (command?.name === 'send') {
@@ -662,10 +772,13 @@ export class Broker {
           explicitQuestion = true;
         } else {
           s = selected();
-          question = this.store.list('wait').find((w) => w.sessionId === s!.id && w.state === 'open');
+          question = this.store
+            .list('wait')
+            .find((w) => w.sessionId === s!.id && w.state === 'open');
         }
-        if (explicitQuestion)
+        if (explicitQuestion) {
           ensure(question, 'WAIT_NOT_FOUND', '引用的问题不存在，请使用 /reply 指定问题。', 404);
+        }
         if (question) {
           s = selected(question.sessionId);
           this.recheck();
@@ -705,7 +818,12 @@ export class Broker {
         // Re-read after I/O: selection is already fixed, cancellation epoch is current.
         s = this.store.get('session', s.id)!;
         this.policy.check(auth);
-        ensure(!['stopping', 'stop_incomplete'].includes(s.state), 'SESSION_STOPPING', '正在停止。', 409);
+        ensure(
+          !['stopping', 'stop_incomplete'].includes(s.state),
+          'SESSION_STOPPING',
+          '正在停止。',
+          409,
+        );
         if (s.state === 'stopped' || s.state === 'offline') {
           s.state = 'ready';
           this.store.put('session', s);
@@ -728,10 +846,13 @@ export class Broker {
         control(errorBody(e).error.message);
       } finally {
         const record = this.store.get('inbox', iid);
-        if (record?.state === 'received') this.store.put('inbox', { ...record, state: 'consumed' });
+        if (record?.state === 'received') {
+          this.store.put('inbox', { ...record, state: 'consumed' });
+        }
       }
     });
   }
+
   async status(s: Session) {
     this.recheck();
     let native: RuntimeSnapshot | { status: 'offline' };
@@ -744,20 +865,32 @@ export class Broker {
     // its fence; refresh visible state from the observed runtime and open wait.
     s = this.store.get('session', s.id)!;
     if (!isFencedState(s.state)) {
-      const waiting = this.store.list('wait').some((w) => w.sessionId === s.id && w.state === 'open');
-      if (native.status === 'offline') s.state = 'offline';
-      else if ('activeFlags' in native && native.activeFlags?.includes('waitingOnApproval'))
+      const waiting = this.store
+        .list('wait')
+        .some((w) => w.sessionId === s.id && w.state === 'open');
+      if (native.status === 'offline') {
+        s.state = 'offline';
+      } else if ('activeFlags' in native && native.activeFlags?.includes('waitingOnApproval')) {
         s.state = 'waiting_approval';
-      else if (waiting) s.state = 'waiting_user';
-      else if (native.status === 'active') s.state = 'running';
-      else if (native.status === 'idle' || native.status === 'owner_online')
+      } else if (waiting) {
+        s.state = 'waiting_user';
+      } else if (native.status === 'active') {
+        s.state = 'running';
+      } else if (native.status === 'idle' || native.status === 'owner_online') {
         s.state = this.store
           .list('job')
-          .some((j) => j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state))
+          .some(
+            (j) =>
+              j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state),
+          )
           ? 'running'
           : 'ready';
-      else if (native.status === 'systemError') s.state = 'error';
-      if (native.status !== 'offline') s.lastSeenAt = now();
+      } else if (native.status === 'systemError') {
+        s.state = 'error';
+      }
+      if (native.status !== 'offline') {
+        s.lastSeenAt = now();
+      }
       this.store.put('session', s);
     }
     return {
@@ -768,8 +901,10 @@ export class Broker {
       native,
       queued_jobs: this.store
         .list('job')
-        .filter((j) => j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state))
-        .length,
+        .filter(
+          (j) =>
+            j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state),
+        ).length,
       waiting_questions: this.store
         .list('wait')
         .filter((w) => w.sessionId === s.id && w.state === 'open')
@@ -783,9 +918,12 @@ export class Broker {
         .at(-1),
     };
   }
+
   async stop(sessionId: string) {
     const ongoing = this.stopping.get(sessionId);
-    if (ongoing) return ongoing;
+    if (ongoing) {
+      return ongoing;
+    }
     // Fence immediately, before waiting for a dispatch already in flight.
     const s = this.store.get('session', sessionId)!;
     s.epoch++;
@@ -817,7 +955,8 @@ export class Broker {
       for (const j of this.store
         .list('job')
         .filter(
-          (j) => j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state),
+          (j) =>
+            j.sessionId === s.id && ['queued', 'dispatching', 'queued_native'].includes(j.state),
         )) {
         j.state = 'cancelled';
         this.store.put('job', j);
@@ -839,13 +978,18 @@ export class Broker {
       this.stopping.delete(sessionId);
     }
   }
+
   recheck() {
     const valid = (auth: AuthStamp, sid?: string, epoch?: number) => {
       try {
         this.policy.check(auth);
         if (sid) {
           const s = this.store.get('session', sid);
-          return !!s && s.epoch === epoch && !['stopping', 'stopped', 'stop_incomplete'].includes(s.state);
+          return (
+            !!s &&
+            s.epoch === epoch &&
+            !['stopping', 'stopped', 'stop_incomplete'].includes(s.state)
+          );
         }
         return true;
       } catch {
@@ -856,15 +1000,18 @@ export class Broker {
       if (!valid(w.auth, w.sessionId, w.epoch)) {
         w.state = 'cancelled';
         w.reason = '访问权限或任务世代已变化';
-      } else if (w.expiresAt <= now()) w.state = 'expired';
-      else {
+      } else if (w.expiresAt <= now()) {
+        w.state = 'expired';
+      } else {
         const o = this.store.get('outbox', w.outboxId);
         if (o && ['failed', 'unknown', 'cancelled'].includes(o.state)) {
           w.state = 'delivery_failed';
           w.reason = '问题投递未确认';
         }
       }
-      if (w.state !== 'open') this.store.put('wait', w);
+      if (w.state !== 'open') {
+        this.store.put('wait', w);
+      }
     }
     for (const w of this.store.list('wait').filter((w) => w.state !== 'open')) {
       const question = this.store.get('outbox', w.outboxId);
@@ -874,25 +1021,33 @@ export class Broker {
         this.store.put('outbox', question);
       }
     }
-    for (const o of this.store.list('outbox').filter((o) => o.state === 'queued' && o.auth))
+    for (const o of this.store.list('outbox').filter((o) => o.state === 'queued' && o.auth)) {
       if (!valid(o.auth!, o.sessionId, o.epoch)) {
         o.state = 'cancelled';
         this.store.put('outbox', o);
       }
-    for (const j of this.store.list('job').filter((j) => j.state === 'queued'))
+    }
+    for (const j of this.store.list('job').filter((j) => j.state === 'queued')) {
       if (!valid(j.auth, j.sessionId, j.epoch)) {
         j.state = 'cancelled';
         this.store.put('job', j);
       }
+    }
   }
+
   tick(): Promise<void> {
-    if (this.closed) return Promise.resolve();
-    if (this.pumping) return this.pumping;
+    if (this.closed) {
+      return Promise.resolve();
+    }
+    if (this.pumping) {
+      return this.pumping;
+    }
     this.pumping = this.pump().finally(() => {
       this.pumping = undefined;
     });
     return this.pumping;
   }
+
   private async pump() {
     this.recheck();
     // Revocation also cancels work already accepted into the native queue.
@@ -904,7 +1059,9 @@ export class Broker {
         revoked.add(j.sessionId);
       }
     }
-    for (const sid of revoked) await this.stop(sid);
+    for (const sid of revoked) {
+      await this.stop(sid);
+    }
     for (const initial of this.store
       .list('outbox')
       .filter((o) => o.state === 'queued' && o.nextAttemptAt <= now())) {
@@ -912,13 +1069,19 @@ export class Broker {
       // question or one of its grants to expire. Check at the side effect.
       this.recheck();
       const o = this.store.get('outbox', initial.id)!;
-      if (o.state !== 'queued') continue;
+      if (o.state !== 'queued') {
+        continue;
+      }
       const channel = this.store.get('channel', o.channelId);
       const conn = this.channels.connections.get(o.channelId);
       const c = this.store.get('conversation', o.conversationId);
-      if (!conn || channel?.state !== 'enabled' || c?.identityVersion !== channel.identityVersion) continue;
+      if (!conn || channel?.state !== 'enabled' || c?.identityVersion !== channel.identityVersion) {
+        continue;
+      }
       try {
-        if (o.auth) this.policy.check(o.auth);
+        if (o.auth) {
+          this.policy.check(o.auth);
+        }
       } catch {
         o.state = 'cancelled';
         this.store.put('outbox', o);
@@ -945,11 +1108,13 @@ export class Broker {
       }
       this.store.put('outbox', o);
     }
-    for (const initial of this.store.list('job').filter((j) => j.state === 'queued'))
+    for (const initial of this.store.list('job').filter((j) => j.state === 'queued')) {
       await this.locks.run(`session:${initial.sessionId}`, async () => {
         const j = this.store.get('job', initial.id)!;
         const s = this.store.get('session', j.sessionId)!;
-        if (j.state !== 'queued' || j.epoch !== s.epoch) return;
+        if (j.state !== 'queued' || j.epoch !== s.epoch) {
+          return;
+        }
         try {
           this.policy.check(j.auth);
           const runtime = await this.runtime(s.runtimeId);
@@ -961,13 +1126,19 @@ export class Broker {
             403,
           );
           this.policy.check(j.auth);
-          ensure(this.store.get('session', s.id)?.epoch === j.epoch, 'STALE_CONTROL_EPOCH', '任务世代变化。');
+          ensure(
+            this.store.get('session', s.id)?.epoch === j.epoch,
+            'STALE_CONTROL_EPOCH',
+            '任务世代变化。',
+          );
           j.state = 'dispatching';
           this.store.put('job', j);
           const result = await runtime.submit(j);
           const fresh = this.store.get('job', j.id)!;
           fresh.nativeQueueId = result.queueId;
-          if (fresh.state === 'dispatching') fresh.state = 'queued_native';
+          if (fresh.state === 'dispatching') {
+            fresh.state = 'queued_native';
+          }
           this.store.put('job', fresh);
           try {
             this.policy.check(j.auth);
@@ -991,19 +1162,28 @@ export class Broker {
           }
         }
       });
+    }
   }
+
   private event(link: RuntimeLink, e: RuntimeNotification) {
-    if (this.closed || e.method !== 'connection/closed') return;
+    if (this.closed || e.method !== 'connection/closed') {
+      return;
+    }
     const s = this.store.list('session').find((s) => s.runtimeId === link.id);
     if (s) {
-      if (!isFencedState(s.state)) s.state = 'offline';
+      if (!isFencedState(s.state)) {
+        s.state = 'offline';
+      }
       this.store.put('session', s);
     }
     this.runtimes.delete(link.id);
   }
+
   async close() {
     this.closed = true;
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
     await this.pumping;
     await Promise.all([...this.stopping.values()]);
     await this.channels.close();

@@ -53,4 +53,17 @@ $connect-to-im
 - [MCP 配置示例](examples/codex-mcp.example.toml)
 - [领域契约](spec/contracts.ts)
 
-CLI 命令：serve、enroll、mcp、portal、install-local、rollback-local、doctor、version。插件构建：`pnpm package:plugin`；验证：`pwsh -NoProfile -File ./scripts/project.ps1 check`；统一格式：`pnpm format`。
+CLI 命令：serve、enroll、mcp、portal、install-local、rollback-local、doctor、version。插件构建：`pnpm package:plugin`。
+
+## 开发检查
+
+```powershell
+pwsh -NoProfile -File ./scripts/project.ps1 lint
+pwsh -NoProfile -File ./scripts/project.ps1 lint:fix
+pwsh -NoProfile -File ./scripts/project.ps1 format
+pwsh -NoProfile -File ./scripts/project.ps1 check
+```
+
+`check` 依次执行 ESLint（零警告）、Prettier 格式检查、类型检查与构建、自动化测试和浏览器验收。ESLint 要求控制语句使用大括号、每行最多一条语句、变量独立声明，并检查未使用变量、类型导入和 React Hook 依赖。
+
+格式固定为 2 空格缩进、100 列目标宽度和 LF 换行，由 `.editorconfig` 与 `.prettierrc.json` 统一。TypeScript 使用 typescript-eslint 声明兼容的 6.0.3；原始 JSON/RPC 边界与测试替身的显式 `any` 暂由领域类型收敛工作处理。

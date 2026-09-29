@@ -46,7 +46,10 @@ it('one approved IM route is chosen automatically; no native IDs in model argume
     expect(first.native_thread_id).toBe(threadId);
     expect(f.store.list('runtime')).toHaveLength(1);
     expect(f.store.list('request')).toHaveLength(1);
-    const result = (await f.broker.tool('register', args, { ...caller, attemptId: randomUUID() })) as any;
+    const result = (await f.broker.tool('register', args, {
+      ...caller,
+      attemptId: randomUUID(),
+    })) as any;
     expect(result.native_thread_id).toBe(threadId);
     expect(result.active).toBe(true);
     expect(f.store.list('session')).toHaveLength(1);
@@ -76,7 +79,11 @@ it('failed native identity check persists no trusted runtime or access request',
             provider: 'codex' as const,
             threadId: randomUUID(),
             homeId: resolve('.test-data/home'),
-            owner: { pid: 123, createdAt: '2026-09-28T00:00:00Z', executable: 'C:/Codex/codex.exe' },
+            owner: {
+              pid: 123,
+              createdAt: '2026-09-28T00:00:00Z',
+              executable: 'C:/Codex/codex.exe',
+            },
           },
         },
       ),
@@ -98,9 +105,14 @@ it('approved identities connect multiple sessions from arbitrary directories wit
     let cwd = resolve('..');
     const original = f.agents.create.bind(f.agents);
     f.agents.create = (link) => {
-      const r = original(link),
-        at = cwd;
-      r.inspect = async () => ({ threadId: link.threadId, cwd: at, status: 'idle', activeTurns: [] });
+      const r = original(link);
+      const at = cwd;
+      r.inspect = async () => ({
+        threadId: link.threadId,
+        cwd: at,
+        status: 'idle',
+        activeTurns: [],
+      });
       return r;
     };
     const caller = () => ({
@@ -114,12 +126,16 @@ it('approved identities connect multiple sessions from arbitrary directories wit
         owner: { pid: 123, createdAt: '2026-09-28T00:00:00Z', executable: 'C:/Codex/codex.exe' },
       },
     });
-    const first = caller(),
-      args = { title: 'any directory', idempotency_key: 'first', activate: true };
+    const first = caller();
+    const args = { title: 'any directory', idempotency_key: 'first', activate: true };
     await f.broker.tool('register', args, { ...first, attemptId: randomUUID() });
     const requests = f.store.list('request').length;
     cwd = resolve('C:/Users/Administrator');
-    const second = (await f.broker.tool('register', { ...args, idempotency_key: 'second' }, caller())) as any;
+    const second = (await f.broker.tool(
+      'register',
+      { ...args, idempotency_key: 'second' },
+      caller(),
+    )) as any;
     expect(second.active).toBe(true);
     expect(f.store.list('session')).toHaveLength(2);
     expect(f.store.list('request')).toHaveLength(requests);

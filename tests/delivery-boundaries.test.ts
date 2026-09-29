@@ -26,7 +26,9 @@ it.each(['expired', 'answered'] as const)(
       if (end === 'expired') {
         w.expiresAt = Date.now() - 1;
         f.store.put('wait', w);
-      } else await f.inbound(`/reply ${w.shortId} Already answered`);
+      } else {
+        await f.inbound(`/reply ${w.shortId} Already answered`);
+      }
       await f.broker.tick();
       expect(f.store.get('wait', w.id)?.state).toBe(end);
       expect(f.store.get('outbox', w.outboxId)?.state).toBe('cancelled');
@@ -52,7 +54,13 @@ it('question deadline is rechecked after an earlier delivery blocks the worker',
     );
     await f.broker.tool(
       'wait_for_user_message',
-      { session_id: a.session.id, mode: 'ask', request_key: 'ttl', prompt: 'Second', timeout_seconds: 1 },
+      {
+        session_id: a.session.id,
+        mode: 'ask',
+        request_key: 'ttl',
+        prompt: 'Second',
+        timeout_seconds: 1,
+      },
       a.caller,
       controller.signal,
     );
@@ -61,7 +69,9 @@ it('question deadline is rechecked after an earlier delivery blocks the worker',
     });
     const sentBefore = f.im.sent.length;
     const pumping = f.broker.tick();
-    while (f.im.sent.length === sentBefore) await sleep(10);
+    while (f.im.sent.length === sentBefore) {
+      await sleep(10);
+    }
     expect(f.im.sent.at(-1)?.text).toContain('first');
     const w = f.store.list('wait')[0];
     w.expiresAt = Date.now() - 1;
@@ -86,7 +96,9 @@ it.each(['/status', '/sessions'] as const)(
       await f.broker.tick();
       await f.inbound(command, { messageId: 'scoped-control' });
       const inbound = f.store.list('inbox').find((i) => i.platformMessageId === 'scoped-control')!;
-      const receipt = f.store.list('outbox').find((o) => o.businessKey === `control:${inbound.id}`)!;
+      const receipt = f.store
+        .list('outbox')
+        .find((o) => o.businessKey === `control:${inbound.id}`)!;
       expect(receipt).toMatchObject({ state: 'queued' });
       expect(receipt.text).toContain('Private A');
       const g = f.store.list('grant').find((g) => g.subject.startsWith('im:'))!;
@@ -140,7 +152,9 @@ it('a cancelled MCP transport preserves the open question for a later resume', a
       controller.signal,
     );
     const until = Date.now() + 1000;
-    while (!f.store.list('wait').length && Date.now() < until) await sleep(10);
+    while (!f.store.list('wait').length && Date.now() < until) {
+      await sleep(10);
+    }
     controller.abort();
     expect(await waiting).toMatchObject({ status: 'waiting' });
     const w = f.store.list('wait')[0];
@@ -149,7 +163,12 @@ it('a cancelled MCP transport preserves the open question for a later resume', a
     expect(
       await f.broker.tool(
         'wait_for_user_message',
-        { session_id: a.session.id, mode: 'resume', request_key: 'resume-after-close', timeout_seconds: 1 },
+        {
+          session_id: a.session.id,
+          mode: 'resume',
+          request_key: 'resume-after-close',
+          timeout_seconds: 1,
+        },
         a.caller,
       ),
     ).toMatchObject({ status: 'answered', reply: { text: 'durable answer' } });
@@ -179,7 +198,10 @@ it('status reconciles an expired wait with the current native runtime state', as
     const w = f.store.list('wait')[0];
     w.expiresAt = Date.now() - 1;
     f.store.put('wait', w);
-    expect(await f.broker.status(a.session)).toMatchObject({ state: 'ready', waiting_questions: [] });
+    expect(await f.broker.status(a.session)).toMatchObject({
+      state: 'ready',
+      waiting_questions: [],
+    });
     a.runtime.active = true;
     expect(await f.broker.status(a.session)).toMatchObject({ state: 'running' });
     await f.broker.stop(a.session.id);

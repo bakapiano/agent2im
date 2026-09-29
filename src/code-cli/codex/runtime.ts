@@ -16,17 +16,22 @@ import type {
 /** Broker-owned protocol connection. Session execution remains with its CLI. */
 export class Rpc {
   readonly events = new EventEmitter();
+
   private child?: ChildProcessWithoutNullStreams;
+
   private serial = 0;
+
   private pending = new Map<
     number,
     { resolve: (v: any) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
   >();
+
   constructor(
     private executable: string,
     private homeId: string,
     private args: string[] = ['app-server', '--stdio'],
   ) {}
+
   async connect() {
     const env: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: this.homeId };
     delete env.CODEX_THREAD_ID;
@@ -41,7 +46,9 @@ export class Rpc {
       this.events.emit('notification', { method: 'connection/closed', params: {} });
     };
     this.child.on('error', (e) => fail(e));
-    this.child.on('exit', () => fail(new AppError('RUNTIME_DISCONNECTED', '队列中继已关闭。', 503)));
+    this.child.on('exit', () =>
+      fail(new AppError('RUNTIME_DISCONNECTED', '队列中继已关闭。', 503)),
+    );
     this.child.stdin.on('error', (e) => fail(e));
     this.child.stderr.resume();
     createInterface({ input: this.child.stdout }).on('line', (line) => {
@@ -56,20 +63,27 @@ export class Rpc {
       if (p) {
         clearTimeout(p.timer);
         this.pending.delete(message.id);
-        message.error
-          ? p.reject(
-              new AppError(
-                'NATIVE_RPC_ERROR',
-                `Codex ${message.error.code}: ${String(message.error.message).slice(0, 180)}`,
-                502,
-              ),
-            )
-          : p.resolve(message.result);
-      } else if (message.method && message.id !== undefined)
+        if (message.error) {
+          p.reject(
+            new AppError(
+              'NATIVE_RPC_ERROR',
+              `Codex ${message.error.code}: ${String(message.error.message).slice(0, 180)}`,
+              502,
+            ),
+          );
+        } else {
+          p.resolve(message.result);
+        }
+      } else if (message.method && message.id !== undefined) {
         this.child!.stdin.write(
-          JSON.stringify({ id: message.id, error: { code: -32601, message: 'Queue relay client' } }) + '\n',
+          JSON.stringify({
+            id: message.id,
+            error: { code: -32601, message: 'Queue relay client' },
+          }) + '\n',
         );
-      else if (message.method) this.events.emit('notification', message);
+      } else if (message.method) {
+        this.events.emit('notification', message);
+      }
     });
     await this.call('initialize', {
       clientInfo: { name: 'agent_to_im_queue', version: '0.2.0' },
@@ -77,6 +91,7 @@ export class Rpc {
     });
     this.child.stdin.write(JSON.stringify({ method: 'initialized' }) + '\n');
   }
+
   call(method: string, params: unknown = {}, timeout = 10000): Promise<any> {
     ensure(
       this.child && this.child.exitCode === null && !this.child.killed,
@@ -94,8 +109,11 @@ export class Rpc {
       this.child!.stdin.write(JSON.stringify({ id, method, params }) + '\n');
     });
   }
+
   async close() {
-    if (!this.child || this.child.exitCode !== null) return;
+    if (!this.child || this.child.exitCode !== null) {
+      return;
+    }
     const child = this.child;
     await new Promise<void>((done) => {
       const timer = setTimeout(() => child.kill(), 3000);
@@ -106,19 +124,24 @@ export class Rpc {
       child.stdin.end();
     });
   }
+
   get processId() {
     return this.child?.pid;
   }
 }
 export class CodexRuntime implements LiveRuntime {
   private rpc: Rpc;
+
   private ready = false;
+
   constructor(private link: RuntimeLink) {
     this.rpc = new Rpc(link.owner.executable, link.homeId);
   }
+
   onEvent(listener: (event: RuntimeNotification) => void) {
     this.rpc.events.on('notification', listener);
   }
+
   async connect() {
     if (!this.ready) {
       await this.rpc.connect();
@@ -126,12 +149,18 @@ export class CodexRuntime implements LiveRuntime {
     }
     return this.inspect();
   }
+
   async inspect(): Promise<RuntimeSnapshot> {
     const { thread } = await this.rpc.call('thread/read', {
       threadId: this.link.threadId,
       includeTurns: false,
     });
-    ensure(thread.id === this.link.threadId, 'THREAD_CONTEXT_UNVERIFIED', '原生会话身份发生变化。', 403);
+    ensure(
+      thread.id === this.link.threadId,
+      'THREAD_CONTEXT_UNVERIFIED',
+      '原生会话身份发生变化。',
+      403,
+    );
     return {
       threadId: thread.id,
       cwd: thread.cwd,
@@ -141,6 +170,7 @@ export class CodexRuntime implements LiveRuntime {
       controlMode: 'queue_relay',
     };
   }
+
   async submit(job: Job) {
     const r = await this.rpc.call('thread/queue/add', {
       threadId: this.link.threadId,
@@ -155,9 +185,14 @@ export class CodexRuntime implements LiveRuntime {
     ensure(r.queuedSubmission?.id, 'NATIVE_PROTOCOL_ERROR', '原生队列缺少投递回执。', 502);
     return { queueId: r.queuedSubmission.id };
   }
+
   async cancelQueued(queueId: string) {
-    await this.rpc.call('thread/queue/delete', { threadId: this.link.threadId, queuedSubmissionId: queueId });
+    await this.rpc.call('thread/queue/delete', {
+      threadId: this.link.threadId,
+      queuedSubmissionId: queueId,
+    });
   }
+
   async stop(): Promise<RuntimeStop> {
     const report: RuntimeStop = {
       complete: false,
@@ -170,7 +205,10 @@ export class CodexRuntime implements LiveRuntime {
     try {
       let cursor: string | undefined;
       do {
-        const page = await this.rpc.call('thread/queue/list', { threadId: this.link.threadId, cursor });
+        const page = await this.rpc.call('thread/queue/list', {
+          threadId: this.link.threadId,
+          cursor,
+        });
         for (const q of page.data) {
           await this.cancelQueued(q.id);
           report.cancelledNativeQueue++;
@@ -187,20 +225,24 @@ export class CodexRuntime implements LiveRuntime {
     }
     report.residuals.push({
       resourceId: this.link.threadId,
-      reason: '队列与持续目标清理已尝试；原 CLI 的运行中 turn、子任务和终端需在原生界面停止并核对。',
+      reason:
+        '队列与持续目标清理已尝试；原 CLI 的运行中 turn、子任务和终端需在原生界面停止并核对。',
     });
     return report;
   }
+
   async close() {
     await this.rpc.close();
     this.ready = false;
   }
+
   get processId() {
     return this.rpc.processId;
   }
 }
 export class CodexRuntimeFactory implements RuntimeFactory {
   validateContext = validateCodexContext;
+
   create(link: RuntimeLink) {
     return new CodexRuntime(link);
   }

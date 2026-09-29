@@ -25,24 +25,31 @@ export const safeChannel = (c: Channel) => ({
 
 export class ChannelService {
   private lock = new KeyedLock();
+
   readonly connections = new Map<string, ImConnection>();
+
   onMessage: (channel: Channel, event: ImEvent) => Promise<void> = async () => {};
+
   onChange: () => void = () => {};
+
   constructor(
     private store: Store,
     private vault: Vault,
     private policy: Policy,
     readonly providers: ImRegistry,
   ) {}
+
   list() {
     return this.store.list('channel').map((c) => ({
       ...safeChannel(c),
       health: this.connections.get(c.id)?.health() ?? { state: 'disconnected' },
     }));
   }
+
   async execute(args: ConfigureImChannelArgs, client?: Client): Promise<unknown> {
     return this.lock.run('configuration', () => this.executeLocked(args, client));
   }
+
   private async executeLocked(args: ConfigureImChannelArgs, client?: Client): Promise<unknown> {
     if (args.operation === 'inspect') {
       const provider = this.providers.describe(args.provider);
@@ -72,13 +79,19 @@ export class ChannelService {
         '渠道别名已属于其他平台，请使用独立别名。',
         409,
       );
-      const channelId = channel?.id ?? this.store.claim('channel-alias', args.channel_alias, id('ch'));
+      const channelId =
+        channel?.id ?? this.store.claim('channel-alias', args.channel_alias, id('ch'));
       const version = channel?.identityVersion ?? 1;
       const requestDigest = digest(args);
       const memoId = `channel:${client?.id ?? 'admin'}:${args.idempotency_key}`;
       const memo = this.store.get('idempotency', memoId);
       if (memo) {
-        ensure(memo.digest === requestDigest, 'IDEMPOTENCY_CONFLICT', '幂等键的配置载荷已变化。', 409);
+        ensure(
+          memo.digest === requestDigest,
+          'IDEMPOTENCY_CONFLICT',
+          '幂等键的配置载荷已变化。',
+          409,
+        );
         return memo.result;
       }
       ensure(
@@ -89,7 +102,9 @@ export class ChannelService {
       );
       this.vault.verify(args.credential_ref, args.provider);
       const identityChanged = channel && channel.appId !== args.app_id;
-      if (channel) await this.stop(channel.id);
+      if (channel) {
+        await this.stop(channel.id);
+      }
       const result: Channel = {
         id: channelId,
         provider: args.provider,
@@ -107,7 +122,9 @@ export class ChannelService {
       };
       this.store.transaction(() => {
         this.store.put('channel', result);
-        if (identityChanged) this.policy.invalidateChannel(channelId);
+        if (identityChanged) {
+          this.policy.invalidateChannel(channelId);
+        }
       });
       const response = {
         operation: args.operation,
@@ -115,7 +132,9 @@ export class ChannelService {
         diagnostics: ['配置已保存，请验证连接后启用。'],
       };
       this.store.put('idempotency', { id: memoId, digest: requestDigest, result: response });
-      this.store.audit('channel.saved', client?.id ?? 'web-admin', channelId, { revision: result.revision });
+      this.store.audit('channel.saved', client?.id ?? 'web-admin', channelId, {
+        revision: result.revision,
+      });
       this.onChange();
       return response;
     }
@@ -180,7 +199,9 @@ export class ChannelService {
         channel.state = 'disabled';
       }
       channel.revision++;
-      if (channel.fingerprint) channel.validationRevision = channel.revision;
+      if (channel.fingerprint) {
+        channel.validationRevision = channel.revision;
+      }
     }
     this.store.put('channel', channel);
     const response = { operation: args.operation, channel: safeChannel(channel), diagnostics: [] };
@@ -191,6 +212,7 @@ export class ChannelService {
     this.onChange();
     return response;
   }
+
   async start(channel: Channel) {
     await this.stop(channel.id);
     const connection = this.providers
@@ -207,8 +229,9 @@ export class ChannelService {
           live?.state === 'enabled' &&
           live.identityVersion === channel.identityVersion &&
           live.appId === channel.appId
-        )
+        ) {
           await this.onMessage(live, event);
+        }
       });
     } catch {
       this.connections.delete(channel.id);
@@ -216,11 +239,15 @@ export class ChannelService {
       throw new AppError('CHANNEL_CONNECTION_FAILED', '渠道连接失败，请核对凭据、网络和平台配置。');
     }
   }
+
   async stop(channelId: string) {
     const connection = this.connections.get(channelId);
     this.connections.delete(channelId);
-    if (connection) await connection.close();
+    if (connection) {
+      await connection.close();
+    }
   }
+
   async restore() {
     for (const c of this.store.list('channel').filter((c) => c.state === 'enabled')) {
       try {
@@ -231,7 +258,10 @@ export class ChannelService {
       }
     }
   }
+
   async close() {
-    for (const channelId of [...this.connections.keys()]) await this.stop(channelId);
+    for (const channelId of [...this.connections.keys()]) {
+      await this.stop(channelId);
+    }
   }
 }

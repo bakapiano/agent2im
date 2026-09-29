@@ -394,7 +394,12 @@ export type ConfigureImChannelArgs =
       expected_revision: number;
       idempotency_key: string;
     }
-  | { operation: 'validate'; channel_id: string; expected_revision: number; idempotency_key: string }
+  | {
+      operation: 'validate';
+      channel_id: string;
+      expected_revision: number;
+      idempotency_key: string;
+    }
   | {
       operation: 'set_enabled';
       channel_id: string;
@@ -404,8 +409,17 @@ export type ConfigureImChannelArgs =
     };
 
 export type ConfigureImChannelResult =
-  | { operation: 'inspect'; provider: string; requirements: string[]; channels: SanitizedImChannel[] }
-  | { operation: 'upsert' | 'validate' | 'set_enabled'; channel: SanitizedImChannel; diagnostics: string[] };
+  | {
+      operation: 'inspect';
+      provider: string;
+      requirements: string[];
+      channels: SanitizedImChannel[];
+    }
+  | {
+      operation: 'upsert' | 'validate' | 'set_enabled';
+      channel: SanitizedImChannel;
+      diagnostics: string[];
+    };
 
 /** Constructed by the Web authentication/CSRF middleware, outside request bodies. */
 export interface VerifiedWebAdmin {
@@ -417,7 +431,11 @@ export interface VerifiedWebAdmin {
 
 /** Web-only control plane. This interface is deliberately separate from MCP tools. */
 export interface WebApprovalService {
-  approve(requestId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<AccessGrant>;
+  approve(
+    requestId: string,
+    expectedRevision: number,
+    admin: VerifiedWebAdmin,
+  ): Promise<AccessGrant>;
   deny(requestId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<void>;
   revoke(grantId: string, expectedRevision: number, admin: VerifiedWebAdmin): Promise<void>;
 }

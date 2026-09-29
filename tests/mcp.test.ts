@@ -6,8 +6,8 @@ import { resolve, join } from 'node:path';
 import { fixture } from './fixture.js';
 import { createServers } from '../src/server.js';
 import { DpapiProtector } from '../src/credentials/protector.js';
-import { sleep } from '../src/core/util.js';
 import { createServer } from 'node:http';
+
 it('MCP initialization and tool listing leave Broker startup idle', async () => {
   let requests = 0;
   const probe = createServer((_, reply) => {
@@ -17,8 +17,8 @@ it('MCP initialization and tool listing leave Broker startup idle', async () => 
   await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
   const port = (probe.address() as { port: number }).port;
   mkdirSync('.test-data', { recursive: true });
-  const temp = mkdtempSync(resolve('.test-data/mcp-idle-')),
-    descriptor = join(temp, 'client.dpapi');
+  const temp = mkdtempSync(resolve('.test-data/mcp-idle-'));
+  const descriptor = join(temp, 'client.dpapi');
   writeFileSync(
     descriptor,
     await new DpapiProtector().protect(
@@ -26,11 +26,11 @@ it('MCP initialization and tool listing leave Broker startup idle', async () => 
     ),
   );
   const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [resolve('dist/cli.js'), 'mcp', '--descriptor', descriptor],
-      stderr: 'pipe',
-    }),
-    client = new Client({ name: 'idle-test', version: '1' });
+    command: process.execPath,
+    args: [resolve('dist/cli.js'), 'mcp', '--descriptor', descriptor],
+    stderr: 'pipe',
+  });
+  const client = new Client({ name: 'idle-test', version: '1' });
   try {
     await client.connect(transport);
     expect((await client.listTools()).tools).toHaveLength(4);
@@ -74,7 +74,9 @@ it('real MCP stdio sidecar lists four tools and configures channels through auth
       'configure_im_channel',
     ]);
     const decode = (r: any) => JSON.parse(r.content[0].text);
-    expect((await client.callTool({ name: 'register', arguments: a.registerArgs })).isError).toBe(true);
+    expect((await client.callTool({ name: 'register', arguments: a.registerArgs })).isError).toBe(
+      true,
+    );
     expect(
       decode(
         await client.callTool({

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { sleep } from '../src/core/util.js';
 import { DpapiProtector } from '../src/credentials/protector.js';
+
 it('built CLI serves real portal, enrolls encrypted descriptor, and doctor reports health', async () => {
   mkdirSync('.test-data', { recursive: true });
   const dir = mkdtempSync(resolve('.test-data/cli-'));
@@ -14,7 +15,16 @@ it('built CLI serves real portal, enrolls encrypted descriptor, and doctor repor
   const agentPort = 22642;
   const child = spawn(
     process.execPath,
-    [cli, 'serve', '--data-dir', dir, '--portal-port', String(portalPort), '--agent-port', String(agentPort)],
+    [
+      cli,
+      'serve',
+      '--data-dir',
+      dir,
+      '--portal-port',
+      String(portalPort),
+      '--agent-port',
+      String(agentPort),
+    ],
     { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   let output = '';
@@ -26,7 +36,9 @@ it('built CLI serves real portal, enrolls encrypted descriptor, and doctor repor
   });
   try {
     const deadline = Date.now() + 15000;
-    while (!output.includes('Portal:') && Date.now() < deadline && child.exitCode === null) await sleep(50);
+    while (!output.includes('Portal:') && Date.now() < deadline && child.exitCode === null) {
+      await sleep(50);
+    }
     expect(output).toContain('Portal:');
     const page = await fetch(`http://127.0.0.1:${portalPort}`);
     expect(page.status).toBe(200);
@@ -47,7 +59,9 @@ it('built CLI serves real portal, enrolls encrypted descriptor, and doctor repor
     ]);
     expect(enrolled.stdout).toContain('客户端已登记');
     expect(existsSync(descriptor)).toBe(true);
-    const plaintext = JSON.parse(await new DpapiProtector().unprotect(readFileSync(descriptor, 'utf8')));
+    const plaintext = JSON.parse(
+      await new DpapiProtector().unprotect(readFileSync(descriptor, 'utf8')),
+    );
     expect(plaintext.clientId).toMatch(/^client_/);
     expect(plaintext.brokerUrl).toBe(`http://127.0.0.1:${agentPort}`);
     expect(enrolled.stdout).not.toContain(plaintext.secret);

@@ -12,6 +12,7 @@ import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { ensure } from '../../core/errors.js';
 import { findCodexExecutable } from './discovery.js';
+
 export interface LocalInstallation {
   buildId: string;
   cliPath: string;
@@ -23,18 +24,22 @@ export interface LocalInstallation {
 }
 
 const sha = (content: Buffer | string) => createHash('sha256').update(content).digest('hex');
+
 function atomic(path: string, content: string) {
   mkdirSync(dirname(path), { recursive: true });
   const temp = `${path}.${randomUUID()}.tmp`;
   writeFileSync(temp, content, { mode: 0o600 });
   renameSync(temp, path);
 }
+
 export function renderMcpConfig(text: string, install: LocalInstallation): string {
   const nl = text.includes('\r\n') ? '\r\n' : '\n';
   const lines = text.split(/\r?\n/);
   const matches = lines
     .map((line, index) =>
-      /^\s*\[mcp_servers\.(?:agent-to-im|"agent-to-im"|'agent-to-im')\]\s*(?:#.*)?$/.test(line) ? index : -1,
+      /^\s*\[mcp_servers\.(?:agent-to-im|"agent-to-im"|'agent-to-im')\]\s*(?:#.*)?$/.test(line)
+        ? index
+        : -1,
     )
     .filter((i) => i >= 0);
   ensure(matches.length < 2, 'CONFIG_AMBIGUOUS', 'MCP 配置包含重复 server 节，请先核对。');
@@ -44,7 +49,7 @@ export function renderMcpConfig(text: string, install: LocalInstallation): strin
     startup_timeout_sec: '15',
     tool_timeout_sec: '360',
   };
-  if (!matches.length)
+  if (!matches.length) {
     return (
       text.replace(/\s*$/, '') +
       nl +
@@ -60,18 +65,23 @@ export function renderMcpConfig(text: string, install: LocalInstallation): strin
       'env_vars = ["CODEX_HOME"]' +
       nl
     );
+  }
   const start = matches[0] + 1;
   let end = start;
-  while (end < lines.length && !/^\s*\[/.test(lines[end])) end++;
+  while (end < lines.length && !/^\s*\[/.test(lines[end])) {
+    end++;
+  }
   const section = lines.slice(start, end);
   const envIndex = section.findIndex((line) => /^\s*env_vars\s*=/.test(line));
-  if (envIndex === -1) section.push('env_vars = ["CODEX_HOME"]');
-  else {
+  if (envIndex === -1) {
+    section.push('env_vars = ["CODEX_HOME"]');
+  } else {
     const match = section[envIndex].match(/^(\s*env_vars\s*=\s*)\[([^\]]*)\](\s*(?:#.*)?)$/);
     ensure(match, 'CONFIG_MULTILINE_UNSUPPORTED', '请将本项目 env_vars 配置为单行数组后重试安装。');
-    if (!/(?:"CODEX_HOME"|'CODEX_HOME')/.test(match[2]))
+    if (!/(?:"CODEX_HOME"|'CODEX_HOME')/.test(match[2])) {
       section[envIndex] =
         `${match[1]}[${match[2].trim()}${match[2].trim() ? ', ' : ''}"CODEX_HOME"]${match[3]}`;
+    }
   }
   for (const [key, value] of Object.entries(values)) {
     const indexes = section
@@ -86,7 +96,9 @@ export function renderMcpConfig(text: string, install: LocalInstallation): strin
         '请将本项目 MCP 的 args 配置为单行数组后重试安装。',
       );
       section[i] = `${key} = ${value}`;
-    } else section.push(`${key} = ${value}`);
+    } else {
+      section.push(`${key} = ${value}`);
+    }
   }
   return [...lines.slice(0, start), ...section, ...lines.slice(end)].join(nl);
 }
@@ -103,14 +115,16 @@ export interface InstallOptions {
   nodePath?: string;
   nativeExecutable?: string;
 }
+
 function within(root: string, path: string) {
   const rel = relative(resolve(root), resolve(path));
   return !rel.startsWith('..') && !isAbsolute(rel);
 }
+
 export function installLocal(options: InstallOptions) {
-  const projectRoot = resolve(options.projectRoot),
-    dataDir = resolve(options.dataDir),
-    codexHome = resolve(options.codexHome);
+  const projectRoot = resolve(options.projectRoot);
+  const dataDir = resolve(options.dataDir);
+  const codexHome = resolve(options.codexHome);
   const build = JSON.parse(readFileSync(join(projectRoot, 'dist/build.json'), 'utf8'));
   ensure(/^[a-f0-9]{16}$/.test(build.buildId), 'BUILD_INVALID', '请先构建当前项目。');
   const compiled = readFileSync(join(projectRoot, 'dist/cli.js'));
@@ -139,7 +153,9 @@ export function installLocal(options: InstallOptions) {
   ];
   const skillsRoot = join(projectRoot, 'plugins/codex/agent-to-im/skills');
   for (const entry of readdirSync(skillsRoot, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile()) continue;
+    if (!entry.isFile()) {
+      continue;
+    }
     const source = join(entry.parentPath, entry.name);
     changes.push({
       path: join(codexHome, 'skills', relative(skillsRoot, source)),
@@ -148,12 +164,13 @@ export function installLocal(options: InstallOptions) {
   }
   // Switch the routing manifest last; existing processes keep their immutable build.
   changes.push({ path: manifest, content: JSON.stringify(install, null, 2) });
-  for (const change of changes)
+  for (const change of changes) {
     ensure(
       within(codexHome, change.path) || within(dataDir, change.path),
       'INSTALL_PATH_INVALID',
       '安装目标路径无效。',
     );
+  }
   if (existsSync(release)) {
     ensure(
       existsSync(cliPath) && sha(readFileSync(cliPath)) === build.cliSha256,
@@ -178,8 +195,12 @@ export function installLocal(options: InstallOptions) {
       process.platform === 'win32' ? 'junction' : 'dir',
     );
   }
-  const changed = changes.filter((c) => !existsSync(c.path) || readFileSync(c.path, 'utf8') !== c.content);
-  if (!changed.length) return { buildId: build.buildId, changed: 0, cliPath };
+  const changed = changes.filter(
+    (c) => !existsSync(c.path) || readFileSync(c.path, 'utf8') !== c.content,
+  );
+  if (!changed.length) {
+    return { buildId: build.buildId, changed: 0, cliPath };
+  }
   const backupDir = join(
     dataDir,
     'install-backups',
@@ -189,8 +210,15 @@ export function installLocal(options: InstallOptions) {
   const entries: BackupEntry[] = changed.map((c, i) => {
     const old = existsSync(c.path) ? readFileSync(c.path) : undefined;
     const backup = old ? join(backupDir, `${i}.bak`) : undefined;
-    if (old && backup) writeFileSync(backup, old, { mode: 0o600 });
-    return { path: c.path, beforeSha: old ? sha(old) : undefined, afterSha: sha(c.content), backup };
+    if (old && backup) {
+      writeFileSync(backup, old, { mode: 0o600 });
+    }
+    return {
+      path: c.path,
+      beforeSha: old ? sha(old) : undefined,
+      afterSha: sha(c.content),
+      backup,
+    };
   });
   writeFileSync(
     join(backupDir, 'manifest.json'),
@@ -198,8 +226,8 @@ export function installLocal(options: InstallOptions) {
     { mode: 0o600 },
   );
   for (let i = 0; i < changed.length; i++) {
-    const c = changed[i],
-      entry = entries[i];
+    const c = changed[i];
+    const entry = entries[i];
     const current = existsSync(c.path) ? sha(readFileSync(c.path)) : undefined;
     ensure(
       current === entry.beforeSha,
@@ -215,7 +243,8 @@ export function rollbackLocal(backupDir: string, dataDir: string) {
   backupDir = resolve(backupDir);
   dataDir = resolve(dataDir);
   ensure(
-    within(join(dataDir, 'install-backups'), backupDir) && backupDir !== join(dataDir, 'install-backups'),
+    within(join(dataDir, 'install-backups'), backupDir) &&
+      backupDir !== join(dataDir, 'install-backups'),
     'ROLLBACK_PATH_INVALID',
     '请选择该数据目录中的一次安装备份。',
   );
@@ -236,16 +265,20 @@ export function rollbackLocal(backupDir: string, dataDir: string) {
       'ROLLBACK_CONCURRENT_EDIT',
       '文件在安装后发生变化，回滚已暂停以保留修改。',
     );
-    if (entry.backup)
+    if (entry.backup) {
       ensure(
         within(backupDir, entry.backup) && sha(readFileSync(entry.backup)) === entry.beforeSha,
         'ROLLBACK_BACKUP_INVALID',
         '备份校验失败。',
       );
+    }
   }
   for (const [index, entry] of [...info.entries].reverse().entries()) {
-    if (entry.backup) atomic(entry.path, readFileSync(entry.backup, 'utf8'));
-    else renameSync(entry.path, join(backupDir, `rolled-back-${index}.saved`));
+    if (entry.backup) {
+      atomic(entry.path, readFileSync(entry.backup, 'utf8'));
+    } else {
+      renameSync(entry.path, join(backupDir, `rolled-back-${index}.saved`));
+    }
   }
   return { restored: info.entries.length, backupDir };
 }

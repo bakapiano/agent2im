@@ -3,11 +3,16 @@ import type { AccessRequest, AuthStamp, Channel, Grant } from '../core/model.js'
 import { ensure } from '../core/errors.js';
 import { digest, id, now } from '../core/util.js';
 
-export const imSubject = (channel: Pick<Channel, 'id' | 'identityVersion'>, tenant: string, user: string) =>
-  `im:${channel.id}:${channel.identityVersion}:${tenant}:${user}`;
+export const imSubject = (
+  channel: Pick<Channel, 'id' | 'identityVersion'>,
+  tenant: string,
+  user: string,
+) => `im:${channel.id}:${channel.identityVersion}:${tenant}:${user}`;
 export class Policy {
   onChange: () => void = () => {};
+
   constructor(private store: Store) {}
+
   find(
     subject: string,
     channel: Pick<Channel, 'id' | 'identityVersion'>,
@@ -25,11 +30,17 @@ export class Policy {
           (!g.expiresAt || g.expiresAt > now()),
       );
   }
-  require(subject: string, channel: Pick<Channel, 'id' | 'identityVersion'>, conversationId: string): Grant {
+
+  require(
+    subject: string,
+    channel: Pick<Channel, 'id' | 'identityVersion'>,
+    conversationId: string,
+  ): Grant {
     const grant = this.find(subject, channel, conversationId);
     ensure(grant, 'ACCESS_DENIED', '该 IM 使用者尚未获准互动，或授权已结束。', 403);
     return grant;
   }
+
   check(stamp: AuthStamp) {
     const channel = this.store.get('channel', stamp.channelId);
     ensure(
@@ -40,6 +51,7 @@ export class Policy {
     );
     this.require(stamp.subject, channel, stamp.conversationId);
   }
+
   request(
     input: Omit<AccessRequest, 'id' | 'state' | 'revision' | 'createdAt' | 'expiresAt'>,
   ): AccessRequest {
@@ -92,6 +104,7 @@ export class Policy {
       return request;
     });
   }
+
   approve(requestId: string, revision: number): Grant {
     const grant = this.store.transaction(() => {
       const request = this.store.get('request', requestId);
@@ -101,7 +114,12 @@ export class Policy {
         '申请已结束或过期。',
         409,
       );
-      ensure(request.revision === revision, 'APPROVAL_REVISION_CONFLICT', '申请已变更，请刷新。', 409);
+      ensure(
+        request.revision === revision,
+        'APPROVAL_REVISION_CONFLICT',
+        '申请已变更，请刷新。',
+        409,
+      );
       const channel = this.store.get('channel', request.channelId);
       const conversation = this.store.get('conversation', request.conversationId);
       ensure(
@@ -143,6 +161,7 @@ export class Policy {
     this.onChange();
     return grant;
   }
+
   deny(requestId: string, revision: number) {
     const request = this.store.get('request', requestId);
     ensure(
@@ -157,15 +176,22 @@ export class Policy {
     this.store.audit('access.denied', 'web-admin', request.id);
     this.onChange();
   }
+
   revoke(grantId: string, revision: number) {
     const grant = this.store.get('grant', grantId);
-    ensure(grant && grant.revision === revision, 'GRANT_REVISION_CONFLICT', '授权已变化，请刷新。', 409);
+    ensure(
+      grant && grant.revision === revision,
+      'GRANT_REVISION_CONFLICT',
+      '授权已变化，请刷新。',
+      409,
+    );
     grant.state = 'revoked';
     grant.revision++;
     this.store.put('grant', grant);
     this.store.audit('access.revoked', 'web-admin', grantId);
     this.onChange();
   }
+
   invalidateChannel(channelId: string) {
     this.store.transaction(() => {
       for (const grant of this.store

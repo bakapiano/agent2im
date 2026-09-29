@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Alert,
@@ -7,12 +7,10 @@ import {
   Card,
   ConfigProvider,
   Descriptions,
-  Empty,
   Form,
   Input,
   Modal,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tabs,
@@ -22,8 +20,11 @@ import {
 import 'antd/dist/reset.css';
 import './style.css';
 import { FeishuChannelFields } from '../im/feishu/channel-fields.js';
+
 const setupToken = new URLSearchParams(location.hash.slice(1)).get('setup');
-if (setupToken) history.replaceState(null, '', location.pathname + location.search);
+if (setupToken) {
+  history.replaceState(null, '', location.pathname + location.search);
+}
 type State = {
   im_providers: any[];
   code_cli_providers: any[];
@@ -36,6 +37,7 @@ type State = {
   audit: any[];
   runtime_links: any[];
 };
+
 function Portal() {
   const [auth, setAuth] = useState<any>();
   const [state, setState] = useState<State>();
@@ -46,22 +48,36 @@ function Portal() {
   const [detail, setDetail] = useState<any>();
   const [credential, setCredential] = useState<string>();
   const [form] = Form.useForm();
-  async function api(path: string, data?: unknown) {
-    const r = await fetch(`/api${path}`, {
-      method: data === undefined ? 'GET' : 'POST',
-      signal: AbortSignal.timeout(25_000),
-      headers: { 'Content-Type': 'application/json', ...(auth?.csrf ? { 'X-CSRF-Token': auth.csrf } : {}) },
-      ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-    });
-    const b = await r.json();
-    if (!b.ok) throw new Error(`${b.error?.code}: ${b.error?.message}`);
-    return b.data;
-  }
-  async function refresh() {
+
+  const csrf = auth?.csrf;
+  const api = useCallback(
+    async (path: string, data?: unknown) => {
+      const r = await fetch(`/api${path}`, {
+        method: data === undefined ? 'GET' : 'POST',
+        signal: AbortSignal.timeout(25_000),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        },
+        ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+      });
+      const b = await r.json();
+      if (!b.ok) {
+        throw new Error(`${b.error?.code}: ${b.error?.message}`);
+      }
+      return b.data;
+    },
+    [csrf],
+  );
+
+  const refresh = useCallback(async () => {
     const a = await api('/auth');
     setAuth(a);
-    if (a.authenticated) setState(await api('/state'));
-  }
+    if (a.authenticated) {
+      setState(await api('/state'));
+    }
+  }, [api]);
+
   async function action(work: () => Promise<void>) {
     setBusy(true);
     setError('');
@@ -74,18 +90,21 @@ function Portal() {
       setBusy(false);
     }
   }
+
   useEffect(() => {
     void refresh().catch((e) => setError(e.message));
-  }, []);
+  }, [refresh]);
   useEffect(() => {
-    if (!auth?.authenticated) return;
+    if (!auth?.authenticated) {
+      return;
+    }
     const timer = setInterval(() => {
       void api('/state')
         .then(setState)
         .catch((e) => setError(e.message));
     }, 5000);
     return () => clearInterval(timer);
-  }, [auth?.authenticated]);
+  }, [api, auth?.authenticated]);
   const mutateChannel = (c: any, operation: string, enabled?: boolean) =>
     action(async () => {
       await api('/channels', {
@@ -96,7 +115,7 @@ function Portal() {
         ...(enabled === undefined ? {} : { enabled }),
       });
     });
-  if (!auth)
+  if (!auth) {
     return (
       <main>
         <h1>Agent to IM</h1>
@@ -104,7 +123,8 @@ function Portal() {
         {error && <Alert type="error" title={error} />}
       </main>
     );
-  if (!auth.authenticated)
+  }
+  if (!auth.authenticated) {
     return (
       <main className="login">
         <Tag color="blue">LOCAL CONTROL PLANE</Tag>
@@ -135,7 +155,9 @@ function Portal() {
               label="管理员密码"
               rules={[{ required: true, min: auth.configured ? 1 : 12 }]}
             >
-              <Input.Password autoComplete={auth.configured ? 'current-password' : 'new-password'} />
+              <Input.Password
+                autoComplete={auth.configured ? 'current-password' : 'new-password'}
+              />
             </Form.Item>
             <Button type="primary" htmlType="submit" loading={busy}>
               进入控制台
@@ -145,6 +167,7 @@ function Portal() {
         <p className="muted">管理会话使用本地 Cookie，Agent 使用独立身份凭据。</p>
       </main>
     );
+  }
   const s = state;
   return (
     <main>
@@ -169,7 +192,14 @@ function Portal() {
         </Space>
       </header>
       {error && (
-        <Alert className="banner" type="error" showIcon title={error} closable onClose={() => setError('')} />
+        <Alert
+          className="banner"
+          type="error"
+          showIcon
+          title={error}
+          closable
+          onClose={() => setError('')}
+        />
       )}
       <div className="metrics">
         <Card>
@@ -277,7 +307,9 @@ function Portal() {
                           </Button>
                           <Button
                             disabled={busy}
-                            onClick={() => void mutateChannel(c, 'set_enabled', c.state !== 'enabled')}
+                            onClick={() =>
+                              void mutateChannel(c, 'set_enabled', c.state !== 'enabled')
+                            }
                           >
                             {c.state === 'enabled' ? '停用' : '启用'}
                           </Button>
@@ -295,7 +327,9 @@ function Portal() {
                       {
                         title: '连接别名',
                         render: (_, c) => (
-                          <Typography.Text copyable={!!c.alias}>{c.alias ?? '等待 Web 审批'}</Typography.Text>
+                          <Typography.Text copyable={!!c.alias}>
+                            {c.alias ?? '等待 Web 审批'}
+                          </Typography.Text>
                         ),
                       },
                       { title: '平台用户', dataIndex: 'userId' },
@@ -315,7 +349,10 @@ function Portal() {
             label: `IM 访问审批 (${s?.requests.filter((r) => r.state === 'pending').length ?? 0})`,
             children: (
               <>
-                <Alert type="info" title="核对 IM 平台用户、租户和渠道，决定谁可以与 Agent 互动。" />
+                <Alert
+                  type="info"
+                  title="核对 IM 平台用户、租户和渠道，决定谁可以与 Agent 互动。"
+                />
                 <Table
                   rowKey="id"
                   dataSource={s?.requests}
@@ -401,7 +438,9 @@ function Portal() {
                       title: '操作',
                       render: (_, r) => (
                         <Button
-                          onClick={() => void action(async () => setDetail(await api(`/sessions/${r.id}`)))}
+                          onClick={() =>
+                            void action(async () => setDetail(await api(`/sessions/${r.id}`)))
+                          }
                         >
                           查看状态
                         </Button>
@@ -502,9 +541,12 @@ function Portal() {
               onClick={() =>
                 void action(async () => {
                   const secret = form.getFieldValue('secret');
-                  if (!secret) throw new Error('请先输入 App Secret');
+                  if (!secret) {
+                    throw new Error('请先输入 App Secret');
+                  }
                   setCredential(
-                    (await api('/credentials', { purpose: channel.provider, secret })).credential_ref,
+                    (await api('/credentials', { purpose: channel.provider, secret }))
+                      .credential_ref,
                   );
                   form.setFieldValue('secret', '');
                 })
@@ -571,16 +613,25 @@ function Portal() {
           />
         )}
       </Modal>
-      <Modal title="原生会话状态" open={!!detail} onCancel={() => setDetail(undefined)} footer={null}>
+      <Modal
+        title="原生会话状态"
+        open={!!detail}
+        onCancel={() => setDetail(undefined)}
+        footer={null}
+      >
         <pre>{JSON.stringify(detail, null, 2)}</pre>
       </Modal>
       <footer>Agent to IM v0.2 · 本地优先 · 审批持久化 · 凭据由 Windows DPAPI 加密</footer>
     </main>
   );
 }
+
 function ensureRef(ref: unknown): asserts ref is string {
-  if (typeof ref !== 'string') throw new Error('请先保存凭据。');
+  if (typeof ref !== 'string') {
+    throw new Error('请先保存凭据。');
+  }
 }
+
 createRoot(document.getElementById('root')!).render(
   <ConfigProvider
     button={{ autoInsertSpace: false }}

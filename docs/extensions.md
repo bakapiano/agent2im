@@ -38,7 +38,8 @@ plugins/
 - `provider.ts` 保存无副作用元数据，适合 Portal 和服务共用。网络 SDK 只在对应平台目录加载。
 - `port.ts` 定义业务所需能力；`registry.ts` 负责选择与能力可用性。Broker 使用两个注册表。
 - `provider` 是必填持久化字段。原生会话唯一键为 `(provider, homeId, threadId)`；不同平台可以使用相同原生 ID。
-- 格式由 `.prettierrc.json` 固定，执行 `pnpm format` 或 `pnpm format:check`。文件名采用 kebab-case，类型和类使用 PascalCase。
+- 格式由 `.editorconfig` 与 `.prettierrc.json` 固定：2 空格、100 列目标宽度、LF。执行 `pnpm format` 或 `pnpm format:check`。文件名采用 kebab-case，类型和类使用 PascalCase。
+- `eslint.config.mjs` 检查控制语句大括号、每行一条语句、独立变量声明、未使用变量、类型导入及 Hook 依赖。`pnpm lint` 使用零警告门槛，`pnpm check` 同时执行 lint 和 format 检查。
 - 通用行为测在公共测试；平台协议测试归入对应平台目录；插件发布验收覆盖真实 CLI 安装和仓库外运行。
 
 ## 新增 IM 平台

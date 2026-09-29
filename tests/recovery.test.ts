@@ -5,10 +5,10 @@ import { fixture, FakeAgents, FakeIm } from './fixture.js';
 import { Store } from '../src/db/store.js';
 import { Broker } from '../src/broker.js';
 import { Vault } from '../src/credentials/vault.js';
-import { EphemeralTestProtector } from '../src/credentials/protector.js';
 import { sleep } from '../src/core/util.js';
 import { ImRegistry } from '../src/im/registry.js';
 import { CodeCliRegistry } from '../src/code-cli/registry.js';
+
 it('SQLite restart preserves grants, selection, answered wait, and uncertain delivery', async () => {
   mkdirSync('.test-data', { recursive: true });
   const dir = mkdtempSync(resolve('.test-data/restart-'));
@@ -47,7 +47,10 @@ it('SQLite restart preserves grants, selection, answered wait, and uncertain del
     await broker.start();
     expect(store.list('grant').map((g) => g.id)).toEqual(granted);
     expect(store.setting(`selection:${a.session.conversationId}`)).toBe(a.session.id);
-    expect(store.list('wait')[0]).toMatchObject({ state: 'answered', reply: { text: 'persistent answer' } });
+    expect(store.list('wait')[0]).toMatchObject({
+      state: 'answered',
+      reply: { text: 'persistent answer' },
+    });
     expect(store.get('outbox', o.id)?.state).toBe('unknown');
   } finally {
     await broker.close();
@@ -65,7 +68,9 @@ it('stop epoch and wait cancellation happen immediately while native dispatch aw
     await f.inbound('task');
     const pumping = f.broker.tick();
     const deadline = Date.now() + 2000;
-    while (!a.runtime.jobs.length && Date.now() < deadline) await sleep(20);
+    while (!a.runtime.jobs.length && Date.now() < deadline) {
+      await sleep(20);
+    }
     const stopping = f.broker.stop(a.session.id);
     expect(f.store.get('session', a.session.id)).toMatchObject({ state: 'stopping', epoch: 2 });
     release();
@@ -103,13 +108,17 @@ it('grant revocation during native submit fences and stops potentially consumed 
     await f.inbound('task');
     const pumping = f.broker.tick();
     const deadline = Date.now() + 2000;
-    while (!a.runtime.jobs.length && Date.now() < deadline) await sleep(20);
+    while (!a.runtime.jobs.length && Date.now() < deadline) {
+      await sleep(20);
+    }
     const g = f.store.list('grant').find((g) => g.subject.startsWith('im:'))!;
     f.broker.policy.revoke(g.id, g.revision);
     release();
     await pumping;
     const until = Date.now() + 1000;
-    while (!a.runtime.stops && Date.now() < until) await sleep(20);
+    while (!a.runtime.stops && Date.now() < until) {
+      await sleep(20);
+    }
     expect(a.runtime.stops).toBe(1);
     expect(f.store.list('job')[0].state).toBe('cancelled');
   } finally {
@@ -144,7 +153,9 @@ it.each(['stopped', 'stop_incomplete', 'stopping'] as const)(
         state: state === 'stopping' ? 'stop_incomplete' : state,
         epoch: 2,
       });
-      if (state === 'stopping') expect(store.list('stop').at(-1)?.report).toMatchObject({ complete: false });
+      if (state === 'stopping') {
+        expect(store.list('stop').at(-1)?.report).toMatchObject({ complete: false });
+      }
     } finally {
       await broker.close();
       store.close();
@@ -188,7 +199,9 @@ it('MCP call begun before stop cannot enter a reopened session epoch', async () 
         (error) => ({ error }),
       );
     const deadline = Date.now() + 1000;
-    while (!a.runtime.inspectEntered && Date.now() < deadline) await sleep(10);
+    while (!a.runtime.inspectEntered && Date.now() < deadline) {
+      await sleep(10);
+    }
     expect(a.runtime.inspectEntered).toBe(true);
     await f.broker.stop(a.session.id);
     await f.inbound('new task');

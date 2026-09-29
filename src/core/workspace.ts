@@ -3,8 +3,11 @@ import { ensure } from './errors.js';
 import { hash } from './util.js';
 
 export function nativePath(path: string): string {
-  if (path.startsWith('\\\\?\\UNC\\')) path = '\\\\' + path.slice(8);
-  else if (path.startsWith('\\\\?\\')) path = path.slice(4);
+  if (path.startsWith('\\\\?\\UNC\\')) {
+    path = '\\\\' + path.slice(8);
+  } else if (path.startsWith('\\\\?\\')) {
+    path = path.slice(4);
+  }
   ensure(isAbsolute(path), 'THREAD_CONTEXT_UNVERIFIED', '原生工作目录必须为绝对路径。', 403);
   return resolve(path);
 }

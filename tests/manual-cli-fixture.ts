@@ -9,24 +9,29 @@ import { DpapiProtector } from '../src/credentials/protector.js';
 import { createServers } from '../src/server.js';
 import { sleep } from '../src/core/util.js';
 import { findCodexExecutable } from '../src/code-cli/codex/discovery.js';
+
 const args = process.argv.slice(2);
 if (args[0] === 'cli') {
   const setup = JSON.parse(readFileSync(args[1], 'utf8'));
-  const child = spawn(findCodexExecutable(), ['--no-alt-screen', '请使用 $connect-to-im 连接本测试会话。'], {
-    windowsHide: true,
-    stdio: 'inherit',
-    env: {
-      PATH: process.env.PATH,
-      SystemRoot: process.env.SystemRoot,
-      TEMP: process.env.TEMP,
-      TMP: process.env.TMP,
-      APPDATA: process.env.APPDATA,
-      LOCALAPPDATA: setup.dir,
-      USERPROFILE: setup.dir,
-      CODEX_HOME: setup.home,
-      TERM: 'xterm-256color',
+  const child = spawn(
+    findCodexExecutable(),
+    ['--no-alt-screen', '请使用 $connect-to-im 连接本测试会话。'],
+    {
+      windowsHide: true,
+      stdio: 'inherit',
+      env: {
+        PATH: process.env.PATH,
+        SystemRoot: process.env.SystemRoot,
+        TEMP: process.env.TEMP,
+        TMP: process.env.TMP,
+        APPDATA: process.env.APPDATA,
+        LOCALAPPDATA: setup.dir,
+        USERPROFILE: setup.dir,
+        CODEX_HOME: setup.home,
+        TERM: 'xterm-256color',
+      },
     },
-  });
+  );
   child.on('exit', (code) => {
     process.exitCode = code ?? 1;
   });
@@ -35,10 +40,18 @@ if (args[0] === 'cli') {
   const dir = mkdtempSync(resolve('.test-data/native-tui-'));
   const home = join(dir, 'codex-home');
   mkdirSync(home);
-  cpSync(resolve('plugins/codex/agent-to-im/skills/connect-to-im'), join(home, 'skills/connect-to-im'), {
-    recursive: true,
-  });
-  const f = await fixture(':memory:', { portalPort: 21643, agentPort: 21642 }, new CodexRuntimeFactory());
+  cpSync(
+    resolve('plugins/codex/agent-to-im/skills/connect-to-im'),
+    join(home, 'skills/connect-to-im'),
+    {
+      recursive: true,
+    },
+  );
+  const f = await fixture(
+    ':memory:',
+    { portalPort: 21643, agentPort: 21642 },
+    new CodexRuntimeFactory(),
+  );
   f.broker.config.dataDir = dir;
   await f.broker.start();
   await f.inbound('/sessions');
@@ -48,7 +61,11 @@ if (args[0] === 'cli') {
   writeFileSync(
     descriptor,
     await new DpapiProtector().protect(
-      JSON.stringify({ brokerUrl: 'http://127.0.0.1:21642', clientId: c.client_id, secret: c.secret }),
+      JSON.stringify({
+        brokerUrl: 'http://127.0.0.1:21642',
+        clientId: c.client_id,
+        secret: c.secret,
+      }),
     ),
   );
   // Test-only policy with shell tools disabled; avoids OS sandbox setup UIs.
@@ -75,7 +92,9 @@ if (args[0] === 'cli') {
   const status = () => ({
     testOnly: true,
     requests: f.store.list('request').map((r) => ({ id: r.id, state: r.state })),
-    sessions: f.store.list('session').map((s) => ({ id: s.id, state: s.state, threadId: s.threadId })),
+    sessions: f.store
+      .list('session')
+      .map((s) => ({ id: s.id, state: s.state, threadId: s.threadId })),
     waits: f.store.list('wait').map((w) => ({ state: w.state, reply: w.reply?.text })),
     jobs: f.store.list('job').map((j) => ({ state: j.state })),
     messages: f.im.sent.map((o) => ({ purpose: o.purpose, text: o.text })),
@@ -90,7 +109,11 @@ if (args[0] === 'cli') {
   let nativeRequests = 0;
   let toolNames: any[] = [];
   let stage = 'register';
-  const registerArgs = { title: 'Native TUI E2E', idempotency_key: 'native-tui-auto', activate: true };
+  const registerArgs = {
+    title: 'Native TUI E2E',
+    idempotency_key: 'native-tui-auto',
+    activate: true,
+  };
   // Isolated test approvals are deterministic fixtures, separate from live grants.
   const approvalTimer = setInterval(() => {
     void f.approveAll();
@@ -114,7 +137,9 @@ if (args[0] === 'cli') {
   const mock = createServer(async (req, res) => {
     let raw = '';
     try {
-      for await (const chunk of req) raw += chunk;
+      for await (const chunk of req) {
+        raw += chunk;
+      }
     } catch {
       return;
     }
@@ -137,13 +162,18 @@ if (args[0] === 'cli') {
     );
     const session = f.store.list('session')[0];
     let call: { name: string; args: unknown } | undefined;
-    if (!session) call = { name: 'register', args: registerArgs };
-    else if (!f.store.list('outbox').some((o) => o.text.includes('native TUI 主动消息')))
+    if (!session) {
+      call = { name: 'register', args: registerArgs };
+    } else if (!f.store.list('outbox').some((o) => o.text.includes('native TUI 主动消息'))) {
       call = {
         name: 'send_message_to_user',
-        args: { session_id: session.id, text: 'native TUI 主动消息', idempotency_key: 'native-tui-send' },
+        args: {
+          session_id: session.id,
+          text: 'native TUI 主动消息',
+          idempotency_key: 'native-tui-send',
+        },
       };
-    else if (!f.store.list('wait').length)
+    } else if (!f.store.list('wait').length) {
       call = {
         name: 'wait_for_user_message',
         args: {
@@ -154,10 +184,10 @@ if (args[0] === 'cli') {
           timeout_seconds: 10,
         },
       };
-    else {
+    } else {
       stage = 'done';
       const job = f.store.list('job').find((j) => j.state === 'queued_native');
-      if (job)
+      if (job) {
         call = {
           name: 'send_message_to_user',
           args: {
@@ -168,6 +198,7 @@ if (args[0] === 'cli') {
             idempotency_key: 'result-' + job.id,
           },
         };
+      }
     }
     const fn = call
       ? (namespace?.tools?.find((t: any) => t.name === call.name) ??
@@ -189,7 +220,9 @@ if (args[0] === 'cli') {
             type: 'message',
             role: 'assistant',
             status: 'completed',
-            content: [{ type: 'output_text', text: 'Native CLI 自动接入与问答验收完成。', annotations: [] }],
+            content: [
+              { type: 'output_text', text: 'Native CLI 自动接入与问答验收完成。', annotations: [] },
+            ],
           };
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     for (const e of [
@@ -208,8 +241,9 @@ if (args[0] === 'cli') {
           usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
         },
       },
-    ])
+    ]) {
       res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
+    }
     res.end();
   });
   await new Promise<void>((r) => mock.listen(21644, '127.0.0.1', r));
@@ -224,22 +258,27 @@ if (args[0] === 'cli') {
   let controlsStarted = false;
   const controlsTimer = setInterval(() => {
     const s = f.store.list('session')[0];
-    if (stage !== 'done' || !s || controlsStarted) return;
+    if (stage !== 'done' || !s || controlsStarted) {
+      return;
+    }
     controlsStarted = true;
     void (async () => {
       await f.inbound('/sessions');
       await f.inbound('/status');
       await f.inbound(`/send ${s.shortId} 从隔离 IM 提交的真实原生任务`);
       const deadline = Date.now() + 15000;
-      while (Date.now() < deadline && !f.store.list('job').some((j) => j.state === 'completed'))
+      while (Date.now() < deadline && !f.store.list('job').some((j) => j.state === 'completed')) {
         await sleep(50);
-      if (!f.store.list('job').some((j) => j.state === 'completed'))
+      }
+      if (!f.store.list('job').some((j) => j.state === 'completed')) {
         throw new Error('IM-origin task did not complete');
+      }
       await f.broker.tick();
       await f.inbound('/stop');
       await f.broker.tick();
-      if (f.store.get('session', s.id)?.state !== 'stop_incomplete')
+      if (f.store.get('session', s.id)?.state !== 'stop_incomplete') {
         throw new Error('Relay must report native stop boundary');
+      }
       verified = true;
       writeFileSync(join(dir, 'result.json'), JSON.stringify(status(), null, 2));
     })().catch((e) => {
@@ -249,7 +288,7 @@ if (args[0] === 'cli') {
   const setup = join(dir, 'setup.json');
   writeFileSync(setup, JSON.stringify({ dir, home, descriptor }));
   console.log(JSON.stringify({ setup, portal: 'http://127.0.0.1:21643/fixture' }));
-  for (const signal of ['SIGINT', 'SIGTERM'] as const)
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
       clearInterval(approvalTimer);
       clearInterval(replyTimer);
@@ -263,4 +302,5 @@ if (args[0] === 'cli') {
           mock.close();
         });
     });
+  }
 }

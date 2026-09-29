@@ -10,7 +10,9 @@ export class AppError extends Error {
   }
 }
 export function ensure(value: unknown, code: string, message: string, status = 400): asserts value {
-  if (!value) throw new AppError(code, message, status);
+  if (!value) {
+    throw new AppError(code, message, status);
+  }
 }
 export function errorBody(error: unknown) {
   const e =

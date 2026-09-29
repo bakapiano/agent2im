@@ -1,4 +1,5 @@
 import type { Channel, Conversation, Outbox } from '../core/model.js';
+
 export interface ImEvent {
   eventId: string;
   messageId: string;
@@ -21,6 +22,9 @@ export interface ImConnection {
   health(): { state: string; error?: string };
 }
 export interface ImFactory {
-  validate(appId: string, secret: string): Promise<{ fingerprint: string; botId: string; tenantId?: string }>;
+  validate(
+    appId: string,
+    secret: string,
+  ): Promise<{ fingerprint: string; botId: string; tenantId?: string }>;
   create(channel: Channel, secret: string): ImConnection;
 }

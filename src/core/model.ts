@@ -130,7 +130,8 @@ export interface Job {
   epoch: number;
   inboxId: string;
   prompt: string;
-  state: 'queued' | 'dispatching' | 'queued_native' | 'completed' | 'cancelled' | 'unknown' | 'failed';
+  state:
+    'queued' | 'dispatching' | 'queued_native' | 'completed' | 'cancelled' | 'unknown' | 'failed';
   auth: AuthStamp;
   nativeTurnId?: string;
   nativeQueueId?: string;

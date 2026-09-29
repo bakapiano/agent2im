@@ -8,7 +8,12 @@
   "conversation_kinds": ["direct"],
   "session_source": "registered-existing",
   "portal_pages": ["channels", "approvals-and-grants", "connected-sessions"],
-  "mcp_tools": ["register", "send_message_to_user", "wait_for_user_message", "configure_im_channel"],
+  "mcp_tools": [
+    "register",
+    "send_message_to_user",
+    "wait_for_user_message",
+    "configure_im_channel"
+  ],
   "skills": ["connect-to-im", "configure-im-channel"],
   "im_commands": ["/sessions", "/switch", "/status", "/send", "/reply", "/stop", "/help"],
   "first_use_approval": "im-user-web-approval",

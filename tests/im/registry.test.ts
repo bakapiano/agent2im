@@ -7,11 +7,20 @@ import { validateTool } from '../../src/core/validation.js';
 it('provider inspection routes guides and reports ready versus planned accurately', async () => {
   const f = await fixture();
   try {
-    const feishu = (await f.broker.channels.execute({ operation: 'inspect', provider: 'feishu' })) as any;
-    expect(feishu).toMatchObject({ provider: 'feishu', status: 'ready', guide: 'references/im/feishu.md' });
+    const feishu = (await f.broker.channels.execute({
+      operation: 'inspect',
+      provider: 'feishu',
+    })) as any;
+    expect(feishu).toMatchObject({
+      provider: 'feishu',
+      status: 'ready',
+      guide: 'references/im/feishu.md',
+    });
     expect(feishu.channels[0].provider).toBe('feishu');
     for (const provider of ['wechat', 'qq'] as const) {
-      expect(() => validateTool('configure_im_channel', { operation: 'inspect', provider })).not.toThrow();
+      expect(() =>
+        validateTool('configure_im_channel', { operation: 'inspect', provider }),
+      ).not.toThrow();
       expect(await f.broker.channels.execute({ operation: 'inspect', provider })).toMatchObject({
         provider,
         status: 'planned',
@@ -33,8 +42,8 @@ it('provider inspection routes guides and reports ready versus planned accuratel
 });
 
 it('registry dispatch is provider-specific and rejects missing discriminators', () => {
-  const first = new FakeIm(),
-    second = new FakeIm();
+  const first = new FakeIm();
+  const second = new FakeIm();
   const registry = new ImRegistry({ feishu: first, qq: second });
   expect(registry.get('feishu')).toBe(first);
   expect(registry.get('qq')).toBe(second);
@@ -51,8 +60,8 @@ it('provider participates in native identity, even with the same home and thread
     const other = new FakeAgents();
     other.validateContext = () => {};
     const alternate = new CodeCliRegistry({ codex: f.agents, claude: other });
-    const create = f.broker.agents.create.bind(alternate),
-      validate = f.broker.agents.validateContext.bind(alternate);
+    const create = f.broker.agents.create.bind(alternate);
+    const validate = f.broker.agents.validateContext.bind(alternate);
     f.broker.agents.create = create;
     f.broker.agents.validateContext = validate;
     const result = (await f.broker.tool(

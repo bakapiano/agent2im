@@ -16,7 +16,9 @@ if (
 const root = resolve('.');
 const info = JSON.parse(readFileSync(join(root, 'dist/build.json'), 'utf8'));
 const output = resolve(process.argv[2] ?? `dist/plugins/${info.buildId}/agent-to-im`);
-if (existsSync(output)) throw new Error('Plugin output already exists; choose a fresh build directory.');
+if (existsSync(output)) {
+  throw new Error('Plugin output already exists; choose a fresh build directory.');
+}
 mkdirSync(output, { recursive: true });
 cpSync(join(root, 'plugins/codex/agent-to-im'), output, { recursive: true });
 const runtime = join(output, 'runtime');
@@ -47,40 +49,60 @@ cpSync(join(root, 'dist/web'), join(runtime, 'dist/web'), { recursive: true });
 // has no links back into the checkout, package-manager store, or user's filesystem.
 const placed = new Map();
 const queue = [];
+
 function packageSource(from, name, optional = false) {
   const resolver = createRequire(join(from, 'package.json'));
   for (const folder of resolver.resolve.paths(name) ?? []) {
     const file = join(folder, name, 'package.json');
-    if (existsSync(file)) return realpathSync(dirname(file));
+    if (existsSync(file)) {
+      return realpathSync(dirname(file));
+    }
   }
-  if (optional) return undefined;
+  if (optional) {
+    return undefined;
+  }
   throw new Error(`Missing production dependency: ${name}`);
 }
+
 function reserve(source, destination) {
   const old = placed.get(destination);
   if (old) {
-    if (old !== source) throw new Error(`Dependency collision at ${destination}`);
+    if (old !== source) {
+      throw new Error(`Dependency collision at ${destination}`);
+    }
     return;
   }
   placed.set(destination, source);
   queue.push({ source, destination });
 }
+
 function inherited(parent, name) {
   let current = parent;
   while (true) {
     const candidate = join(current, 'node_modules', name);
-    if (placed.has(candidate)) return { path: candidate, source: placed.get(candidate) };
-    if (current === runtime) return undefined;
-    const next = dirname(current);
-    if (next === current || (next !== runtime && !relative(runtime, next).startsWith('node_modules')))
+    if (placed.has(candidate)) {
+      return { path: candidate, source: placed.get(candidate) };
+    }
+    if (current === runtime) {
       return undefined;
+    }
+    const next = dirname(current);
+    if (
+      next === current ||
+      (next !== runtime && !relative(runtime, next).startsWith('node_modules'))
+    ) {
+      return undefined;
+    }
     current = next;
   }
 }
+
 const roots = new Set();
 for (const compiled of Object.values(result.metafile.outputs)) {
   for (const dependency of compiled.imports) {
-    if (!dependency.external || isBuiltin(dependency.path)) continue;
+    if (!dependency.external || isBuiltin(dependency.path)) {
+      continue;
+    }
     roots.add(
       dependency.path.startsWith('@')
         ? dependency.path.split('/').slice(0, 2).join('/')
@@ -88,32 +110,45 @@ for (const compiled of Object.values(result.metafile.outputs)) {
     );
   }
 }
-for (const name of roots) reserve(packageSource(root, name), join(runtime, 'node_modules', name));
+for (const name of roots) {
+  reserve(packageSource(root, name), join(runtime, 'node_modules', name));
+}
 for (const { source, destination } of queue) {
   const pkg = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'));
   cpSync(source, destination, {
     recursive: true,
     dereference: true,
-    filter: (path) => path === source || !relative(source, path).split(/[\\/]/).includes('node_modules'),
+    filter: (path) =>
+      path === source || !relative(source, path).split(/[\\/]/).includes('node_modules'),
   });
   const dependencies = { ...pkg.dependencies, ...pkg.optionalDependencies };
   for (const name of Object.keys(dependencies)) {
-    const dependency = packageSource(source, name, Object.hasOwn(pkg.optionalDependencies ?? {}, name));
-    if (!dependency) continue;
+    const dependency = packageSource(
+      source,
+      name,
+      Object.hasOwn(pkg.optionalDependencies ?? {}, name),
+    );
+    if (!dependency) {
+      continue;
+    }
     const existing = inherited(destination, name);
-    if (existing?.source === dependency) continue;
+    if (existing?.source === dependency) {
+      continue;
+    }
     reserve(
       dependency,
       existing ? join(destination, 'node_modules', name) : join(runtime, 'node_modules', name),
     );
   }
 }
-const executable = join(runtime, 'node.exe'),
-  cli = join(runtime, 'dist/cli.js');
+const executable = join(runtime, 'node.exe');
+const cli = join(runtime, 'dist/cli.js');
 const version = JSON.parse(
   execFileSync(executable, [cli, 'version'], { cwd: output, encoding: 'utf8', windowsHide: true }),
 );
-if (version.buildId !== info.buildId) throw new Error('Packaged runtime build mismatch.');
+if (version.buildId !== info.buildId) {
+  throw new Error('Packaged runtime build mismatch.');
+}
 const checkSqlite =
   'const D=require("better-sqlite3");const d=new D(":memory:");d.exec("select 1");d.close();';
 execFileSync(executable, ['-e', checkSqlite], { cwd: runtime, windowsHide: true });
@@ -133,5 +168,10 @@ writeFileSync(
   ),
 );
 console.log(
-  JSON.stringify({ plugin: output, buildId: info.buildId, node: process.version, packages: placed.size }),
+  JSON.stringify({
+    plugin: output,
+    buildId: info.buildId,
+    node: process.version,
+    packages: placed.size,
+  }),
 );

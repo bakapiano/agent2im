@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import staticFiles from '@fastify/static';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { randomBytes, scrypt as scryptCallback } from 'node:crypto';
 import { promisify } from 'node:util';
 import { Ajv2020 } from 'ajv/dist/2020.js';
@@ -11,11 +11,15 @@ import { AppError, ensure, errorBody } from './core/errors.js';
 import { hash, now, sameSecret, token } from './core/util.js';
 import { validateTool } from './core/validation.js';
 import { appVersion, buildId } from './core/build.js';
+
 const scrypt = promisify(scryptCallback);
 const ajv = new Ajv2020({ strict: false });
 const string = { type: 'string', minLength: 1, maxLength: 16384 };
 const schemas: Record<string, any> = {
-  bootstrap: { password: { type: 'string', minLength: 12, maxLength: 1024 }, bootstrap_token: string },
+  bootstrap: {
+    password: { type: 'string', minLength: 12, maxLength: 1024 },
+    bootstrap_token: string,
+  },
   login: { password: { type: 'string', minLength: 1, maxLength: 1024 } },
   credential: { secret: string, purpose: { enum: ['feishu'] } },
   enroll: { name: { type: 'string', minLength: 1, maxLength: 120 } },
@@ -36,12 +40,17 @@ const schemas: Record<string, any> = {
           type: 'object',
           additionalProperties: false,
           required: ['pid', 'createdAt', 'executable'],
-          properties: { pid: { type: 'integer', minimum: 1 }, createdAt: string, executable: string },
+          properties: {
+            pid: { type: 'integer', minimum: 1 },
+            createdAt: string,
+            executable: string,
+          },
         },
       },
     },
   },
 };
+
 function body(request: FastifyRequest, name: string, optional: string[] = []): any {
   const properties = schemas[name];
   const validate = ajv.compile({
@@ -53,6 +62,7 @@ function body(request: FastifyRequest, name: string, optional: string[] = []): a
   ensure(validate(request.body), 'INVALID_ARGUMENTS', '请求参数无效。');
   return request.body;
 }
+
 function base(port: number): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: 32_768, requestTimeout: 370_000 });
   app.setErrorHandler((error, request, reply) => {
@@ -60,9 +70,19 @@ function base(port: number): FastifyInstance {
     reply.code(status).send(errorBody(error));
   });
   app.addHook('onRequest', async (request, reply) => {
-    ensure(request.headers.host === `127.0.0.1:${port}`, 'HOST_FORBIDDEN', '请通过本机回环地址访问。', 403);
+    ensure(
+      request.headers.host === `127.0.0.1:${port}`,
+      'HOST_FORBIDDEN',
+      '请通过本机回环地址访问。',
+      403,
+    );
     const origin = request.headers.origin;
-    ensure(!origin || origin === `http://127.0.0.1:${port}`, 'ORIGIN_FORBIDDEN', '请求来源无效。', 403);
+    ensure(
+      !origin || origin === `http://127.0.0.1:${port}`,
+      'ORIGIN_FORBIDDEN',
+      '请求来源无效。',
+      403,
+    );
     reply
       .header('Cache-Control', 'no-store')
       .header('X-Content-Type-Options', 'nosniff')
@@ -74,12 +94,18 @@ function base(port: number): FastifyInstance {
   });
   return app;
 }
-export async function createServers(broker: Broker, installationSecret: string, bootstrapToken: string) {
+
+export async function createServers(
+  broker: Broker,
+  installationSecret: string,
+  bootstrapToken: string,
+) {
   const { store, config } = broker;
   const portal = base(config.portalPort);
   const agent = base(config.agentPort);
   await portal.register(cookie);
   const attempts = new Map<string, { count: number; until: number }>();
+
   function rate(key: string, limit = 10) {
     let row = attempts.get(key);
     if (!row || row.until < now()) {
@@ -88,11 +114,12 @@ export async function createServers(broker: Broker, installationSecret: string, 
     }
     ensure(++row.count <= limit, 'RATE_LIMITED', '操作频繁，请稍后重试。', 429);
   }
+
   function admin(request: FastifyRequest, mutation = false) {
     const sid = (request as any).cookies?.ati_admin;
     const session = typeof sid === 'string' ? store.get('adminSession', hash(sid)) : undefined;
     ensure(session && session.expiresAt > now(), 'ADMIN_UNAUTHORIZED', '请登录本地管理端。', 401);
-    if (mutation)
+    if (mutation) {
       ensure(
         request.headers.origin === `http://127.0.0.1:${config.portalPort}` &&
           typeof request.headers['x-csrf-token'] === 'string' &&
@@ -101,8 +128,10 @@ export async function createServers(broker: Broker, installationSecret: string, 
         '请刷新页面后重试。',
         403,
       );
+    }
     return session;
   }
+
   function authOrigin(request: FastifyRequest) {
     ensure(
       request.headers.origin === `http://127.0.0.1:${config.portalPort}`,
@@ -112,16 +141,29 @@ export async function createServers(broker: Broker, installationSecret: string, 
     );
     rate('login');
   }
+
   async function passwordHash(password: string, salt: string) {
     return ((await scrypt(password, salt, 64)) as Buffer).toString('hex');
   }
+
   async function signIn(reply: any) {
     const secret = token();
-    const session = { id: hash(secret), csrf: token(), createdAt: now(), expiresAt: now() + 8 * 3600_000 };
+    const session = {
+      id: hash(secret),
+      csrf: token(),
+      createdAt: now(),
+      expiresAt: now() + 8 * 3600_000,
+    };
     store.put('adminSession', session);
-    reply.setCookie('ati_admin', secret, { httpOnly: true, sameSite: 'strict', path: '/', maxAge: 8 * 3600 });
+    reply.setCookie('ati_admin', secret, {
+      httpOnly: true,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 8 * 3600,
+    });
     return { ok: true, data: { csrf: session.csrf } };
   }
+
   portal.get('/api/auth', async (request) => {
     const configured = !!store.setting('adminPassword');
     try {
@@ -230,7 +272,10 @@ export async function createServers(broker: Broker, installationSecret: string, 
   if (existsSync(join(config.webRoot, 'index.html'))) {
     await portal.register(staticFiles, { root: config.webRoot });
     portal.get('/', async (_, reply) => reply.sendFile('index.html'));
-  } else portal.get('/', async () => ({ message: '请运行 pnpm build 生成 Web Portal。' }));
+  } else {
+    portal.get('/', async () => ({ message: '请运行 pnpm build 生成 Web Portal。' }));
+  }
+
   function local(request: FastifyRequest) {
     ensure(
       !request.headers.origin &&
@@ -241,6 +286,7 @@ export async function createServers(broker: Broker, installationSecret: string, 
       401,
     );
   }
+
   agent.get('/health', async () => ({
     ok: true,
     service: 'agent-to-im',
@@ -268,7 +314,9 @@ export async function createServers(broker: Broker, installationSecret: string, 
     };
     const controller = new AbortController();
     const onClose = () => {
-      if (!reply.raw.writableEnded) controller.abort();
+      if (!reply.raw.writableEnded) {
+        controller.abort();
+      }
     };
     reply.raw.on('close', onClose);
     try {

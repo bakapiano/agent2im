@@ -69,7 +69,9 @@ export function findCodexExecutable(): string {
   return file;
 }
 let host: Promise<HostIdentity> | undefined;
-export async function discoverNative(meta: Record<string, unknown> | undefined): Promise<NativeContext> {
+export async function discoverNative(
+  meta: Record<string, unknown> | undefined,
+): Promise<NativeContext> {
   const threadId = nativeThreadId(meta);
   host ??= parentProcesses().then((parents) => {
     const p = parents.find((p) => /^codex(?:\.exe)?$/i.test(basename(p.executable)));

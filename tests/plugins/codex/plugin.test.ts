@@ -1,7 +1,14 @@
 import { expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  lstatSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import Database from 'better-sqlite3';
@@ -23,14 +30,19 @@ it('relocated plugin initializes once on tool use and keeps data outside its cac
   }
   const data = join(root, 'data');
   mkdirSync(data);
-  const portalPort = await freePort(),
-    agentPort = await freePort();
-  writeFileSync(join(data, 'settings.json'), JSON.stringify({ workspaces: {}, portalPort, agentPort }));
+  const portalPort = await freePort();
+  const agentPort = await freePort();
+  writeFileSync(
+    join(data, 'settings.json'),
+    JSON.stringify({ workspaces: {}, portalPort, agentPort }),
+  );
   const clients = [
     new Client({ name: 'plugin-test-a', version: '1' }),
     new Client({ name: 'plugin-test-b', version: '1' }),
   ];
-  const manifest = JSON.parse(readFileSync(join(plugin, '.mcp.json'), 'utf8')).mcpServers['agent-to-im'];
+  const manifest = JSON.parse(readFileSync(join(plugin, '.mcp.json'), 'utf8')).mcpServers[
+    'agent-to-im'
+  ];
   let brokerPid: number | undefined;
   try {
     await Promise.all(
@@ -57,17 +69,22 @@ it('relocated plugin initializes once on tool use and keeps data outside its cac
         }),
       ),
     );
-    for (const reply of replies)
+    for (const reply of replies) {
       expect(JSON.parse((reply.content as any)[0].text)).toMatchObject({
         ok: true,
         data: { provider: 'feishu', status: 'ready' },
       });
+    }
     const health = (await (await fetch(`http://127.0.0.1:${agentPort}/health`)).json()) as any;
     brokerPid = health.pid;
-    expect(health.buildId).toBe(JSON.parse(readFileSync(join(plugin, 'build.json'), 'utf8')).buildId);
+    expect(health.buildId).toBe(
+      JSON.parse(readFileSync(join(plugin, 'build.json'), 'utf8')).buildId,
+    );
     const db = new Database(join(data, 'broker.sqlite'), { readonly: true });
     try {
-      expect((db.prepare("select count(*) as n from records where kind='client'").get() as any).n).toBe(1);
+      expect(
+        (db.prepare("select count(*) as n from records where kind='client'").get() as any).n,
+      ).toBe(1);
       expect(db.pragma('user_version', { simple: true })).toBe(5);
     } finally {
       db.close();
@@ -85,10 +102,14 @@ it('relocated plugin initializes once on tool use and keeps data outside its cac
     ).toBe(false);
   } finally {
     await Promise.all(clients.map((client) => client.close()));
-    if (!brokerPid)
+    if (!brokerPid) {
       try {
-        brokerPid = ((await (await fetch(`http://127.0.0.1:${agentPort}/health`)).json()) as any).pid;
-      } catch {}
+        brokerPid = ((await (await fetch(`http://127.0.0.1:${agentPort}/health`)).json()) as any)
+          .pid;
+      } catch {
+        // Startup may have failed before the health endpoint became available.
+      }
+    }
     if (brokerPid) {
       process.kill(brokerPid);
       await sleep(200);

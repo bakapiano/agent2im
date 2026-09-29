@@ -14,13 +14,15 @@
     "dev:web": "vite --config vite.config.ts",
     "build": "tsc --noEmit && vite build && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write src tests spec plugins scripts/*.mjs *.json *.ts",
-    "format:check": "prettier --check src tests spec plugins scripts/*.mjs *.json *.ts",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "format": "prettier --write src tests spec plugins scripts/*.mjs *.json *.ts *.mjs",
+    "format:check": "prettier --check src tests spec plugins scripts/*.mjs *.json *.ts *.mjs",
     "package:plugin": "pnpm build && node scripts/package-plugin.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "pnpm build && pnpm test && pnpm test:e2e"
+    "check": "pnpm lint && pnpm format:check && pnpm build && pnpm test && pnpm test:e2e"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
@@ -37,7 +39,9 @@
     "ws": "8.21.3"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.6.3",
     "@types/react": "19.3.0",
@@ -45,9 +49,14 @@
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.1.1",
     "esbuild": "0.28.2",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
     "prettier": "3.9.9",
     "tsx": "4.23.15",
-    "typescript": "7.0.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0",
     "vite": "8.3.1",
     "vitest": "5.0.2"
   },

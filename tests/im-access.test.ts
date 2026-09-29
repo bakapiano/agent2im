@@ -1,9 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import Database from 'better-sqlite3';
 import { fixture } from './fixture.js';
-import { Store } from '../src/db/store.js';
 
 it('IM denial, identity separation and expiry govern interaction', async () => {
   const f = await fixture();
@@ -14,7 +10,11 @@ it('IM denial, identity separation and expiry govern interaction', async () => {
     await f.inbound('still private');
     expect(f.store.list('inbox')).toHaveLength(0);
     expect(f.store.list('grant')).toHaveLength(0);
-    await f.inbound('/sessions', { userId: 'second-user', chatId: 'second-chat', displayName: 'same-name' });
+    await f.inbound('/sessions', {
+      userId: 'second-user',
+      chatId: 'second-chat',
+      displayName: 'same-name',
+    });
     const second = f.store.list('request').find((r) => r.id !== denied.id)!;
     const grant = f.broker.policy.approve(second.id, second.revision);
     expect(grant.subject).not.toBe(denied.subject);
@@ -31,8 +31,8 @@ it('IM denial, identity separation and expiry govern interaction', async () => {
 it('local channel configuration and registration share only the IM user decision', async () => {
   const f = await fixture();
   try {
-    const c = f.broker.enroll('new local client', 'test'),
-      caller = { clientId: c.client_id, secret: c.secret, attemptId: 'configuration' };
+    const c = f.broker.enroll('new local client', 'test');
+    const caller = { clientId: c.client_id, secret: c.secret, attemptId: 'configuration' };
     const inspected = (await f.broker.tool(
       'configure_im_channel',
       { operation: 'inspect', provider: 'feishu' },
@@ -57,8 +57,8 @@ it('local channel configuration and registration share only the IM user decision
     );
     expect(f.store.list('request')).toEqual([]);
     expect(f.store.list('grant')).toEqual([]);
-    const first = await f.connect('one'),
-      second = await f.connect('two');
+    const first = await f.connect('one');
+    const second = await f.connect('two');
     expect(first.session.clientId).not.toBe(second.session.clientId);
     expect(f.store.list('request')).toHaveLength(1);
     expect(f.store.list('grant')).toHaveLength(1);

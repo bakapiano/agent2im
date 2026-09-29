@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+
 export const id = (prefix: string) => `${prefix}_${randomUUID()}`;
 export const now = () => Date.now();
 export const token = () => randomBytes(32).toString('base64url');
@@ -9,12 +10,15 @@ export function sameSecret(a: string, b: string): boolean {
   return timingSafeEqual(aa, bb);
 }
 export function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object')
+  if (Array.isArray(value)) {
+    return `[${value.map(canonical).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
     return `{${Object.keys(value)
       .sort()
       .map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`)
       .join(',')}}`;
+  }
   return JSON.stringify(value) ?? 'null';
 }
 export const digest = (value: unknown) => hash(canonical(value));

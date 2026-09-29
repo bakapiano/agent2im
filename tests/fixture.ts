@@ -6,21 +6,28 @@ import { EphemeralTestProtector } from '../src/credentials/protector.js';
 import { Vault } from '../src/credentials/vault.js';
 import type { ImConnection, ImEvent, ImFactory, ImReceipt } from '../src/im/port.js';
 import type { LiveRuntime, RuntimeFactory, RuntimeNotification } from '../src/code-cli/port.js';
-import type { Channel, Conversation, Job, Outbox, RuntimeLink, Session } from '../src/core/model.js';
+import type { Conversation, Job, Outbox, RuntimeLink, Session } from '../src/core/model.js';
 import { now } from '../src/core/util.js';
 import { ImRegistry } from '../src/im/registry.js';
 import { CodeCliRegistry } from '../src/code-cli/registry.js';
 import { validateCodexContext } from '../src/code-cli/codex/discovery.js';
+
 export class FakeIm implements ImFactory {
   sent: Outbox[] = [];
+
   receipts: ImReceipt[] = [];
+
   handler?: (e: ImEvent) => Promise<void>;
+
   validationGate?: Promise<void>;
+
   sendGate?: Promise<void>;
+
   async validate() {
     await this.validationGate;
     return { fingerprint: 'bot-identity', botId: 'bot-1' };
   }
+
   create(): ImConnection {
     return {
       start: async (fn) => {
@@ -38,25 +45,39 @@ export class FakeIm implements ImFactory {
 }
 export class FakeRuntime implements LiveRuntime {
   events: Array<(e: RuntimeNotification) => void> = [];
+
   jobs: Job[] = [];
+
   cancelled: string[] = [];
+
   stops = 0;
+
   turnId = 'turn-fixture';
+
   verified = true;
+
   active = false;
+
   submitGate?: Promise<void>;
+
   inspectGate?: Promise<void>;
+
   inspectEntered = false;
+
   constructor(readonly link: RuntimeLink) {}
+
   async connect() {
     return this.inspect();
   }
+
   async inspect() {
     this.inspectEntered = true;
     const gate = this.inspectGate;
     this.inspectGate = undefined;
     await gate;
-    if (!this.verified) throw new Error('unverified');
+    if (!this.verified) {
+      throw new Error('unverified');
+    }
     return {
       threadId: this.link.threadId,
       cwd: this.link.cwd || resolve('.'),
@@ -64,14 +85,17 @@ export class FakeRuntime implements LiveRuntime {
       activeTurns: this.active ? [this.turnId] : [],
     };
   }
+
   async submit(j: Job) {
     this.jobs.push(j);
     await this.submitGate;
     return { queueId: `queue-${j.id}` };
   }
+
   async cancelQueued(id: string) {
     this.cancelled.push(id);
   }
+
   async stop() {
     this.stops++;
     this.active = false;
@@ -84,17 +108,24 @@ export class FakeRuntime implements LiveRuntime {
       residuals: [],
     };
   }
+
   onEvent(fn: (e: RuntimeNotification) => void) {
     this.events.push(fn);
   }
+
   emit(method: string, params: Record<string, any>) {
-    for (const fn of this.events) fn({ method, params: { threadId: this.link.threadId, ...params } });
+    for (const fn of this.events) {
+      fn({ method, params: { threadId: this.link.threadId, ...params } });
+    }
   }
+
   async close() {}
 }
 export class FakeAgents implements RuntimeFactory {
   validateContext = validateCodexContext;
+
   all: FakeRuntime[] = [];
+
   create(link: RuntimeLink) {
     const r = new FakeRuntime(link);
     this.all.push(r);
@@ -162,10 +193,13 @@ export async function fixture(
       text,
       ...extra,
     });
+
   async function approveAll() {
-    for (const r of store.list('request').filter((r) => r.state === 'pending'))
+    for (const r of store.list('request').filter((r) => r.state === 'pending')) {
       broker.policy.approve(r.id, r.revision);
+    }
   }
+
   async function connect(title = '测试会话', activate = true) {
     await inbound('/sessions');
     await approveAll();
@@ -183,8 +217,16 @@ export async function fixture(
       nativeContext,
       attemptId: randomUUID(),
     };
-    const args = { connection_alias: conversation.alias!, title, idempotency_key: randomUUID(), activate };
-    const result = (await broker.tool('register', args, { ...caller, attemptId: randomUUID() })) as any;
+    const args = {
+      connection_alias: conversation.alias!,
+      title,
+      idempotency_key: randomUUID(),
+      activate,
+    };
+    const result = (await broker.tool('register', args, {
+      ...caller,
+      attemptId: randomUUID(),
+    })) as any;
     return {
       caller,
       result,
@@ -193,6 +235,7 @@ export async function fixture(
       registerArgs: args,
     };
   }
+
   return {
     store,
     broker,
